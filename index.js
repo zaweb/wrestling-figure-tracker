@@ -1,5 +1,6 @@
 // index.js
 import path from 'path';
+import { timingSafeEqual } from 'crypto';
 import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
@@ -11,9 +12,43 @@ import { snapshotFigure, startPriceCron } from './cronJob.js';
 
 dotenv.config();
 
+function credentialsMatch(given, expected) {
+  const left = Buffer.from(given);
+  const right = Buffer.from(expected);
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
+}
+
+function requireSitePassword(req, res, next) {
+  const user = process.env.SITE_USER;
+  const password = process.env.SITE_PASSWORD;
+  if (!user || !password) return next();
+
+  const header = req.headers.authorization || '';
+  const space = header.indexOf(' ');
+  const scheme = space === -1 ? '' : header.slice(0, space);
+  const encoded = space === -1 ? '' : header.slice(space + 1);
+
+  if (scheme.toLowerCase() === 'basic' && encoded) {
+    const decoded = Buffer.from(encoded, 'base64').toString('utf8');
+    const sep = decoded.indexOf(':');
+    if (sep !== -1) {
+      const givenUser = decoded.slice(0, sep);
+      const givenPassword = decoded.slice(sep + 1);
+      if (credentialsMatch(givenUser, user) && credentialsMatch(givenPassword, password)) {
+        return next();
+      }
+    }
+  }
+
+  res.set('WWW-Authenticate', 'Basic realm="Wrestling Tracker"');
+  return res.status(401).send('Authentication required');
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(requireSitePassword);
 
 // Initialize DB and cron scheduler
 connectDB();

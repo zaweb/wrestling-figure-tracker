@@ -1,4 +1,6 @@
 // index.js
+import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -147,6 +149,15 @@ app.get('/api/tracked-figures/:id/trends', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+if (process.env.NODE_ENV === 'production') {
+  const clientDist = path.join(path.dirname(fileURLToPath(import.meta.url)), 'client', 'dist');
+  app.use(express.static(clientDist));
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

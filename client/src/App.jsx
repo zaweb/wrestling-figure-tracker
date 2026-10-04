@@ -140,6 +140,14 @@ export default function App() {
 
   const selected = tracked.find((figure) => figure._id === selectedId) || null
   const snapshot = selected ? latestSnapshot(selected) : null
+  const pricedResults = figures.filter((figure) => figure.price > 0)
+  const cheapest = pricedResults.length
+    ? Math.min(...pricedResults.map((figure) => figure.price))
+    : null
+  const mostExpensive = pricedResults.length
+    ? Math.max(...pricedResults.map((figure) => figure.price))
+    : null
+  const resultCurrency = pricedResults[0]?.currency || 'USD'
 
   return (
     <main className="page">
@@ -191,6 +199,18 @@ export default function App() {
               query.trim() ? ` for “${searchKeywordsFor(query.trim(), brand)}”` : ''
             }.`}
           </p>
+        )}
+        {cheapest != null && (
+          <dl className="stats">
+            <div>
+              <dt>Cheapest</dt>
+              <dd>{money(cheapest, resultCurrency)}</dd>
+            </div>
+            <div>
+              <dt>Most expensive</dt>
+              <dd>{money(mostExpensive, resultCurrency)}</dd>
+            </div>
+          </dl>
         )}
         {figures.length > 0 && (
           <ul className="cards">

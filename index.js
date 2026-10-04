@@ -17,49 +17,6 @@ app.use(express.json());
 connectDB();
 startPriceCron();
 
-// 1. Live eBay figure search for the React UI
-// app.get('/api/figures/search', async (req, res) => {
-//   const { query, brand } = req.query;
-//   if (!query) return res.status(400).json({ error: 'Search query is required' });
-
-//   try {
-//     const token = await getEbayAppToken();
-//     const searchQuery = brand ? `${brand} ${query}` : query;
-
-//     const params = new URLSearchParams({
-//       q: searchQuery,
-//       category_ids: '246',
-//       filter: 'buyingOptions:{FIXED_PRICE}',
-//       limit: '20',
-//     });
-
-//     const response = await fetch(
-//       `${EBAY_API_BASE}/buy/browse/v1/item_summary/search?${params.toString()}`,
-//       {
-//         headers: {
-//           Authorization: `Bearer ${token}`,
-//           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-//         },
-//       }
-//     );
-
-//     const data = await response.json();
-//     const figures = (data.itemSummaries || []).map((item) => ({
-//       id: item.itemId,
-//       title: item.title,
-//       price: parseFloat(item.price?.value || 0),
-//       currency: item.price?.currency,
-//       condition: item.condition,
-//       imageUrl: item.image?.imageUrl,
-//       itemUrl: item.itemWebUrl,
-//     }));
-
-//     res.json({ figures, total: data.total });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
 app.get('/api/figures/search', async (req, res) => {
   const { query, brand } = req.query;
   console.log(`[Search Route] Received query: "${query}", brand: "${brand}"`);

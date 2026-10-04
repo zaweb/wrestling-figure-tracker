@@ -1,0 +1,9 @@
+# Start Mongo server:
+brew services start mongodb-community 
+
+# Start Vite proxy
+cd client
+npm run dev
+
+# Start server
+npm run server

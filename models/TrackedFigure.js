@@ -21,7 +21,7 @@ const TrackedFigureSchema = new mongoose.Schema(
     searchKeywords: { type: String, required: true }, // e.g., "Mattel Cody Rhodes Ultimate Edition 16"
     condition: {
       type: String,
-      enum: ['ALL', 'MOC', 'LOOSE'],
+      enum: ['ALL', '1000', '1500', '3000', '4000', '5000', '6000'],
       default: 'ALL',
     },
     snapshots: [SnapshotSchema],

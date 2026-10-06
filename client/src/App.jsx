@@ -13,6 +13,20 @@ import './App.css'
 
 const BRANDS = ['', 'Mattel', 'Jazwares', 'Hasbro']
 
+const CONDITIONS = [
+  { id: 'ALL', label: 'All' },
+  { id: '1000', label: 'New' },
+  { id: '1500', label: 'New other' },
+  { id: '3000', label: 'Used' },
+  { id: '4000', label: 'Very Good' },
+  { id: '5000', label: 'Good' },
+  { id: '6000', label: 'Acceptable' },
+]
+
+function conditionLabel(id) {
+  return CONDITIONS.find((condition) => condition.id === id)?.label || 'All'
+}
+
 function money(value, currency = 'USD') {
   if (value == null || Number.isNaN(Number(value))) return '—'
   return new Intl.NumberFormat('en-US', {
@@ -43,6 +57,7 @@ async function readJson(response) {
 export default function App() {
   const [query, setQuery] = useState('')
   const [brand, setBrand] = useState('Mattel')
+  const [condition, setCondition] = useState('ALL')
   const [figures, setFigures] = useState([])
   const [total, setTotal] = useState(null)
   const [searchError, setSearchError] = useState('')
@@ -96,7 +111,7 @@ export default function App() {
     event.preventDefault()
     setSearching(true)
     setSearchError('')
-    const params = new URLSearchParams({ query: query.trim() })
+    const params = new URLSearchParams({ query: query.trim(), condition })
     if (brand) params.set('brand', brand)
 
     try {
@@ -126,7 +141,7 @@ export default function App() {
             name: query.trim(),
             brand,
             searchKeywords: keywords,
-            condition: 'ALL',
+            condition,
           }),
         }),
       )
@@ -173,6 +188,16 @@ export default function App() {
               {BRANDS.map((option) => (
                 <option key={option || 'any'} value={option}>
                   {option || 'Any'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Condition
+            <select value={condition} onChange={(event) => setCondition(event.target.value)}>
+              {CONDITIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
                 </option>
               ))}
             </select>
@@ -272,7 +297,9 @@ export default function App() {
                     {selected.name}
                     {selected.brand ? ` · ${selected.brand}` : ''}
                   </h3>
-                  <p className="meta">Search: {selected.searchKeywords}</p>
+                  <p className="meta">
+                    Search: {selected.searchKeywords} · {conditionLabel(selected.condition)}
+                  </p>
                   {snapshot ? (
                     <dl className="stats">
                       <div>

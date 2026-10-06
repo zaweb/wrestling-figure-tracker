@@ -3,13 +3,14 @@ import cron from 'node-cron';
 import { EBAY_API_BASE, getEbayAppToken } from './ebayAuth.js';
 import { calculatePriceMetrics } from './utils/priceCalculator.js';
 import { TrackedFigure } from './models/TrackedFigure.js';
+import { ebaySearchFilter, normalizeCondition } from './ebaySearch.js';
 
 export async function snapshotFigure(figure) {
   const token = await getEbayAppToken();
   const params = new URLSearchParams({
     q: figure.searchKeywords,
     category_ids: '246', // Action Figures category
-    filter: 'buyingOptions:{FIXED_PRICE}',
+    filter: ebaySearchFilter(figure.condition),
     limit: '50',
   });
 
@@ -27,7 +28,15 @@ export async function snapshotFigure(figure) {
   const listings = data.itemSummaries || [];
   const stats = calculatePriceMetrics(listings);
 
-  if (!stats) return null;
+  const figureDoc = await TrackedFigure.findById(figure._id);
+  if (!figureDoc) return null;
+
+  figureDoc.condition = normalizeCondition(figureDoc.condition);
+
+  if (!stats) {
+    if (figureDoc.isModified('condition')) await figureDoc.save();
+    return null;
+  }
 
   // Normalize today's date to midnight UTC
   const today = new Date();
@@ -41,10 +50,6 @@ export async function snapshotFigure(figure) {
     avgPrice: stats.avgPrice,
     medianPrice: stats.medianPrice,
   };
-
-  // Find if a snapshot already exists for today; replace it or push a new one
-  const figureDoc = await TrackedFigure.findById(figure._id);
-  if (!figureDoc) return null;
 
   const existingIndex = figureDoc.snapshots.findIndex(
     (s) => new Date(s.date).toISOString().slice(0, 10) === today.toISOString().slice(0, 10)

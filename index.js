@@ -7,6 +7,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDB } from './db.js';
 import { EBAY_API_BASE, EBAY_ENV, getEbayAppToken } from './ebayAuth.js';
+import { ebaySearchFilter, normalizeCondition } from './ebaySearch.js';
 import { TrackedFigure } from './models/TrackedFigure.js';
 import { snapshotFigure, startPriceCron } from './cronJob.js';
 
@@ -55,8 +56,8 @@ connectDB();
 startPriceCron();
 
 app.get('/api/figures/search', async (req, res) => {
-  const { query, brand } = req.query;
-  console.log(`[Search Route] Received query: "${query}", brand: "${brand}"`);
+  const { query, brand, condition } = req.query;
+  console.log(`[Search Route] Received query: "${query}", brand: "${brand}", condition: "${condition}"`);
 
   if (!query) {
     return res.status(400).json({ error: 'Search query is required' });
@@ -71,7 +72,7 @@ app.get('/api/figures/search', async (req, res) => {
     const params = new URLSearchParams({
       q: searchQuery,
       category_ids: '246',
-      filter: 'buyingOptions:{FIXED_PRICE}',
+      filter: ebaySearchFilter(condition),
       limit: '20',
     });
 
@@ -135,7 +136,7 @@ app.post('/api/tracked-figures', async (req, res) => {
       brand,
       series,
       searchKeywords,
-      condition: condition || 'ALL',
+      condition: normalizeCondition(condition),
       snapshots: [],
     });
 

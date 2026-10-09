@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import './App.css'
 
-const BRANDS = ['', 'Mattel', 'Jazwares', 'Hasbro']
+const BRANDS = ['', 'Mattel', 'Jazwares', 'Hasbro', 'LJN']
 
 const CONDITIONS = [
   { id: 'ALL', label: 'All' },

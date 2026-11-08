@@ -10,6 +10,8 @@ import { EBAY_API_BASE, EBAY_ENV, getEbayAppToken } from './ebayAuth.js';
 import { ebaySearchFilter, normalizeCondition } from './ebaySearch.js';
 import { TrackedFigure } from './models/TrackedFigure.js';
 import { snapshotFigure, startPriceCron } from './cronJob.js';
+import { AppraisalError, appraisalStatus, findComparables, identifyFigure } from './appraisal.js';
+import Anthropic from '@anthropic-ai/sdk';
 
 dotenv.config();
 
@@ -48,6 +50,8 @@ function requireSitePassword(req, res, next) {
 
 const app = express();
 app.use(cors());
+// Photo uploads arrive as base64 JSON, so appraisal routes accept larger bodies.
+app.use('/api/appraisals', express.json({ limit: '40mb' }));
 app.use(express.json());
 app.use(requireSitePassword);
 
@@ -183,6 +187,51 @@ app.get('/api/tracked-figures/:id/trends', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Identify and price a figure from photos
+function sendAppraisalError(res, label, err) {
+  if (err instanceof AppraisalError) {
+    console.warn(`[Appraisal] ${label} failed: ${err.message}`);
+    return res.status(err.status).json({ error: err.message });
+  }
+  console.error(`[Appraisal] ${label} failed:`, err);
+  if (err instanceof Anthropic.AuthenticationError) {
+    return res.status(503).json({ error: 'The Anthropic API key was rejected. Check ANTHROPIC_API_KEY in .env.' });
+  }
+  if (err instanceof Anthropic.RateLimitError) {
+    return res.status(429).json({ error: 'Claude is rate limited right now. Try again in a minute.' });
+  }
+  if (err instanceof Anthropic.APIError) {
+    return res.status(502).json({ error: `Claude request failed: ${err.message}` });
+  }
+  return res.status(500).json({ error: err.message });
+}
+
+app.get('/api/appraisals/status', (req, res) => {
+  res.json(appraisalStatus());
+});
+
+app.post('/api/appraisals/identify', async (req, res) => {
+  const started = Date.now();
+  try {
+    const result = await identifyFigure(req.body || {});
+    console.log(`[Appraisal] Identified in ${((Date.now() - started) / 1000).toFixed(1)}s: ${result.candidates[0] ? `${result.candidates[0].manufacturer} ${result.candidates[0].name}` : 'no candidates'}`);
+    res.json(result);
+  } catch (err) {
+    sendAppraisalError(res, 'Identify', err);
+  }
+});
+
+app.post('/api/appraisals/price', async (req, res) => {
+  const started = Date.now();
+  try {
+    const result = await findComparables(req.body || {});
+    console.log(`[Appraisal] Judged ${result.listings.length} listings in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+    res.json(result);
+  } catch (err) {
+    sendAppraisalError(res, 'Price', err);
   }
 });
 

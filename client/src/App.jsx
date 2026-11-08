@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import './App.css'
+import Appraise from './Appraise.jsx'
 
 const BRANDS = ['', 'Mattel', 'Jazwares', 'Hasbro', 'LJN']
 
@@ -70,6 +71,7 @@ export default function App() {
   const [tracking, setTracking] = useState(false)
   const [listError, setListError] = useState('')
   const [showCollection, setShowCollection] = useState(false)
+  const [showAppraise, setShowAppraise] = useState(false)
 
   useEffect(() => {
     loadTracked()
@@ -173,7 +175,13 @@ export default function App() {
           <p>Search current eBay listings, then save a search to watch its prices.</p>
         </div>
         <div className="header-actions">
-          <button type="button">Add Figure</button>
+          <button
+            type="button"
+            className={showAppraise ? 'selected' : ''}
+            onClick={() => setShowAppraise((open) => !open)}
+          >
+            Add Figure
+          </button>
           <button
             type="button"
             className={showCollection ? 'secondary selected' : 'secondary'}
@@ -183,6 +191,10 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {showAppraise && (
+        <Appraise onClose={() => setShowAppraise(false)} onTracked={(id) => loadTracked(id)} />
+      )}
 
       {showCollection && (
         <section className="panel">

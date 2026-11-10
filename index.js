@@ -23,6 +23,10 @@ function credentialsMatch(given, expected) {
 }
 
 function requireSitePassword(req, res, next) {
+  // Android install checks the page, manifest, and icons from Google's
+  // servers, which cannot send this login. Only the API stays locked.
+  if (!req.path.startsWith('/api')) return next();
+
   const user = process.env.SITE_USER;
   const password = process.env.SITE_PASSWORD;
   if (!user || !password) return next();

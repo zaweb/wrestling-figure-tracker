@@ -25,21 +25,21 @@
 }
 
 .header-actions button.selected {
-  outline: 2px solid #1c1917;
+  outline: 2px solid var(--text);
   outline-offset: 2px;
 }
 
 .header p {
   margin: 8px 0 0;
   max-width: 40rem;
-  color: #57534e;
+  color: var(--muted);
 }
 
 .panel {
   margin-top: 28px;
   padding: 20px;
-  background: #fffdf8;
-  border: 1px solid #e7e0d4;
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 16px;
 }
 
@@ -65,16 +65,16 @@ label {
   flex-direction: column;
   gap: 4px;
   font-size: 0.85rem;
-  color: #57534e;
+  color: var(--muted);
 }
 
 input,
 select {
   min-width: 180px;
   padding: 8px 10px;
-  border: 1px solid #d6d3d1;
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-  background: white;
+  background: var(--card);
   color: inherit;
 }
 
@@ -86,12 +86,12 @@ button {
   padding: 8px 14px;
   border: 0;
   border-radius: 8px;
-  background: #9a3412;
-  color: white;
+  background: var(--button);
+  color: var(--button-text);
 }
 
 button.secondary {
-  background: #44403c;
+  background: var(--secondary);
 }
 
 button:disabled {
@@ -101,12 +101,12 @@ button:disabled {
 
 .message {
   margin: 12px 0 0;
-  color: #9a3412;
+  color: var(--accent);
 }
 
 .meta {
   margin: 12px 0 0;
-  color: #57534e;
+  color: var(--muted);
 }
 
 .cards {
@@ -123,9 +123,9 @@ button:disabled {
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  border: 1px solid #e7e0d4;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--card);
 }
 
 .card img,
@@ -133,14 +133,14 @@ button:disabled {
   width: 100%;
   height: 180px;
   object-fit: contain;
-  background: #f5f5f4;
+  background: var(--surface);
   border-radius: 8px;
 }
 
 .placeholder {
   display: grid;
   place-items: center;
-  color: #a8a29e;
+  color: var(--faint);
 }
 
 .card h3 {
@@ -156,7 +156,7 @@ button:disabled {
 
 .condition {
   margin: 0;
-  color: #57534e;
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
@@ -179,13 +179,13 @@ button:disabled {
   width: 100%;
   text-align: left;
   color: inherit;
-  background: #fff;
-  border: 1px solid #e7e0d4;
+  background: var(--card);
+  border: 1px solid var(--border);
 }
 
 .watch-list button.selected {
-  border-color: #9a3412;
-  background: #fff7ed;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .watch-list strong,
@@ -195,7 +195,7 @@ button:disabled {
 
 .watch-list span {
   margin-top: 4px;
-  color: #57534e;
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
@@ -211,7 +211,7 @@ button:disabled {
 }
 
 .stats dt {
-  color: #57534e;
+  color: var(--muted);
   font-size: 0.8rem;
 }
 
@@ -228,7 +228,7 @@ button:disabled {
 
 .empty {
   margin: 0;
-  color: #57534e;
+  color: var(--muted);
 }
 
 @media (max-width: 800px) {
@@ -244,7 +244,7 @@ button:disabled {
 }
 
 .appraise.dragging {
-  box-shadow: 0 0 0 3px #9a3412;
+  box-shadow: 0 0 0 3px var(--accent);
 }
 
 .appraise-head {
@@ -272,7 +272,7 @@ button:disabled {
 .link-button {
   padding: 4px 0;
   background: none;
-  color: #9a3412;
+  color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -281,14 +281,14 @@ button:disabled {
   margin: 0 0 12px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #f5f5f4;
-  color: #44403c;
+  background: var(--surface);
+  color: var(--chip-text);
   font-size: 0.9rem;
 }
 
 .banner.warn {
-  background: #fff7ed;
-  color: #9a3412;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .hero-drop {
@@ -299,10 +299,10 @@ button:disabled {
   gap: 6px;
   min-height: 240px;
   padding: 32px 16px;
-  border: 2px dashed #d6d3d1;
+  border: 2px dashed var(--border-strong);
   border-radius: 16px;
-  background: #fff;
-  color: #57534e;
+  background: var(--card);
+  color: var(--muted);
   font-size: 0.95rem;
   text-align: center;
   cursor: pointer;
@@ -311,21 +311,21 @@ button:disabled {
 
 .hero-drop:hover,
 .appraise.dragging .hero-drop {
-  border-color: #9a3412;
-  background: #fff7ed;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .hero-drop svg {
-  color: #9a3412;
+  color: var(--accent);
 }
 
 .hero-drop strong {
-  color: #1c1917;
+  color: var(--text);
   font-size: 1.15rem;
 }
 
 .hero-drop small {
-  color: #a8a29e;
+  color: var(--faint);
 }
 
 .appraise-layout {
@@ -346,8 +346,8 @@ button:disabled {
 .main-photo {
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid #e7e0d4;
-  background: #f5f5f4;
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .main-photo img {
@@ -375,11 +375,11 @@ button:disabled {
   border-radius: 8px;
   overflow: hidden;
   border: 2px solid transparent;
-  background: #f5f5f4;
+  background: var(--surface);
 }
 
 .thumb.active .thumb-select {
-  border-color: #9a3412;
+  border-color: var(--accent);
 }
 
 .thumb-select img {
@@ -397,7 +397,8 @@ button:disabled {
   height: 20px;
   padding: 0;
   border-radius: 50%;
-  background: #1c1917;
+  background: var(--text);
+  color: var(--bg);
   font-size: 0.8rem;
   line-height: 1;
 }
@@ -407,15 +408,15 @@ button:disabled {
   place-items: center;
   width: 52px;
   height: 52px;
-  border: 2px dashed #d6d3d1;
+  border: 2px dashed var(--border-strong);
   border-radius: 8px;
-  color: #9a3412;
+  color: var(--accent);
   font-size: 1.4rem;
   cursor: pointer;
 }
 
 .thumb-add:hover {
-  border-color: #9a3412;
+  border-color: var(--accent);
 }
 
 .notes input {
@@ -437,9 +438,9 @@ button:disabled {
 
 .block {
   padding: 16px 18px;
-  border: 1px solid #e7e0d4;
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: #fff;
+  background: var(--card);
 }
 
 .block p {
@@ -447,7 +448,7 @@ button:disabled {
 }
 
 .block.hint {
-  background: #fafaf9;
+  background: var(--hint);
   border-style: dashed;
 }
 
@@ -456,7 +457,7 @@ button:disabled {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  color: #78716c;
+  color: var(--subtle);
   font-size: 0.78rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -471,25 +472,25 @@ button:disabled {
   display: inline-block;
   padding: 2px 10px;
   border-radius: 999px;
-  background: #f5f5f4;
-  color: #44403c;
+  background: var(--surface);
+  color: var(--chip-text);
   font-size: 0.8rem;
   white-space: nowrap;
 }
 
 .pill.high {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--high-bg);
+  color: var(--high-text);
 }
 
 .pill.medium {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--medium-bg);
+  color: var(--medium-text);
 }
 
 .pill.low {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--low-bg);
+  color: var(--low-text);
 }
 
 .match-name {
@@ -500,14 +501,14 @@ button:disabled {
 }
 
 .match-variant {
-  color: #78716c;
+  color: var(--subtle);
   font-weight: 400;
   font-size: 1.1rem;
 }
 
 .match-line {
   margin: 4px 0 0;
-  color: #57534e;
+  color: var(--muted);
 }
 
 .evidence {
@@ -516,11 +517,11 @@ button:disabled {
   gap: 10px;
   margin: 14px 0 0;
   padding: 12px 0 0;
-  border-top: 1px solid #f0ebe3;
+  border-top: 1px solid var(--line);
 }
 
 .evidence dt {
-  color: #78716c;
+  color: var(--subtle);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -538,7 +539,7 @@ button:disabled {
 .more summary,
 .listings summary {
   cursor: pointer;
-  color: #57534e;
+  color: var(--muted);
 }
 
 .value-row {
@@ -562,7 +563,7 @@ button:disabled {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  color: #57534e;
+  color: var(--muted);
 }
 
 .loading-line {
@@ -570,7 +571,7 @@ button:disabled {
   align-items: center;
   gap: 10px;
   margin: 14px 0;
-  color: #57534e;
+  color: var(--muted);
 }
 
 .strip {
@@ -589,7 +590,7 @@ button:disabled {
   right: 0;
   top: 50%;
   height: 2px;
-  background: #e7e0d4;
+  background: var(--border);
 }
 
 .strip-band {
@@ -598,7 +599,7 @@ button:disabled {
   height: 12px;
   transform: translateY(-50%);
   border-radius: 6px;
-  background: #fed7aa;
+  background: var(--strip);
 }
 
 .strip-dot {
@@ -607,8 +608,8 @@ button:disabled {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  border: 2px solid #fff;
-  background: #a8a29e;
+  border: 2px solid var(--strip-edge);
+  background: var(--faint);
   transform: translate(-50%, -50%);
 }
 
@@ -618,14 +619,14 @@ button:disabled {
   bottom: 0;
   width: 3px;
   border-radius: 2px;
-  background: #9a3412;
+  background: var(--accent);
   transform: translateX(-50%);
 }
 
 .strip-labels {
   display: flex;
   justify-content: space-between;
-  color: #78716c;
+  color: var(--subtle);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
@@ -636,7 +637,7 @@ button:disabled {
   gap: 12px;
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid #f0ebe3;
+  border-top: 1px solid var(--line);
 }
 
 .adjust-row select {
@@ -672,8 +673,8 @@ button:disabled {
   min-width: 72px;
   padding: 1px 8px;
   border-radius: 6px;
-  background: #f5f5f4;
-  color: #57534e;
+  background: var(--surface);
+  color: var(--muted);
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   text-align: center;
@@ -681,19 +682,19 @@ button:disabled {
 }
 
 .severity.moderate {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--medium-bg);
+  color: var(--medium-text);
 }
 
 .severity.major {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--low-bg);
+  color: var(--low-text);
 }
 
 .improve {
-  background: #fffbeb;
-  border-color: #fde68a;
-  color: #78350f;
+  background: var(--improve-bg);
+  border-color: var(--improve-border);
+  color: var(--improve-text);
 }
 
 .improve ul {
@@ -712,14 +713,14 @@ button:disabled {
   display: inline-block;
   padding: 8px 14px;
   border-radius: 8px;
-  background: #9a3412;
-  color: white;
+  background: var(--button);
+  color: var(--button-text);
   font-size: 1rem;
   cursor: pointer;
 }
 
 .button-like.secondary {
-  background: #44403c;
+  background: var(--secondary);
 }
 
 button.small {
@@ -765,8 +766,8 @@ button.small {
 .chip {
   padding: 1px 8px;
   border-radius: 999px;
-  background: #f5f5f4;
-  color: #57534e;
+  background: var(--surface);
+  color: var(--muted);
   font-size: 0.78rem;
 }
 
@@ -797,7 +798,7 @@ button.small {
   gap: 10px;
   align-items: center;
   padding: 8px 0;
-  border-top: 1px solid #f0ebe3;
+  border-top: 1px solid var(--line);
 }
 
 .listing img,
@@ -806,7 +807,7 @@ button.small {
   height: 40px;
   border-radius: 6px;
   object-fit: cover;
-  background: #f5f5f4;
+  background: var(--surface);
 }
 
 .listing-main {
@@ -832,13 +833,13 @@ button.small {
 }
 
 .listing-reason {
-  color: #78716c;
+  color: var(--subtle);
   font-size: 0.8rem;
 }
 
 .listing-reason .tag {
   margin-right: 6px;
-  color: #9a3412;
+  color: var(--accent);
 }
 
 .listing-price {
@@ -852,7 +853,7 @@ button.small {
 
 .list-head {
   margin: 16px 0 0;
-  color: #57534e;
+  color: var(--muted);
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -879,16 +880,16 @@ button.small {
   grid-template-columns: 22px 1fr auto;
   gap: 10px;
   align-items: center;
-  color: #a8a29e;
+  color: var(--faint);
 }
 
 .progress-step.active {
-  color: #1c1917;
+  color: var(--text);
   font-weight: 600;
 }
 
 .progress-step.done {
-  color: #166534;
+  color: var(--high-text);
 }
 
 .progress-icon {
@@ -897,7 +898,7 @@ button.small {
 }
 
 .progress-time {
-  color: #78716c;
+  color: var(--subtle);
   font-size: 0.8rem;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
@@ -907,8 +908,8 @@ button.small {
   display: inline-block;
   width: 16px;
   height: 16px;
-  border: 2px solid #fed7aa;
-  border-top-color: #9a3412;
+  border: 2px solid var(--strip);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -959,21 +960,21 @@ button.small {
 
 button.option {
   padding: 5px 12px;
-  border: 1px solid #fcd34d;
+  border: 1px solid var(--option-border);
   border-radius: 999px;
-  background: #fff;
-  color: #78350f;
+  background: var(--card);
+  color: var(--improve-text);
   font-size: 0.9rem;
 }
 
 button.option:hover {
-  border-color: #b45309;
+  border-color: var(--option-hover);
 }
 
 button.option.chosen {
-  border-color: #9a3412;
-  background: #9a3412;
-  color: #fff;
+  border-color: var(--button);
+  background: var(--button);
+  color: var(--button-text);
 }
 
 .improve-sub {

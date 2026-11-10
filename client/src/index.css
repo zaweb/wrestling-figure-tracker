@@ -1,8 +1,85 @@
 :root {
-  color: #1c1917;
-  background: #f4efe6;
+  color-scheme: light;
+  --bg: #f4efe6;
+  --text: #1c1917;
+  --muted: #57534e;
+  --subtle: #78716c;
+  --faint: #a8a29e;
+  --panel: #fffdf8;
+  --card: #fff;
+  --surface: #f5f5f4;
+  --hint: #fafaf9;
+  --border: #e7e0d4;
+  --border-strong: #d6d3d1;
+  --line: #f0ebe3;
+  --accent: #9a3412;
+  --accent-soft: #fff7ed;
+  --button: #9a3412;
+  --button-text: #fff;
+  --secondary: #44403c;
+  --chip-text: #44403c;
+  --strip: #fed7aa;
+  --strip-edge: #fff;
+  --improve-bg: #fffbeb;
+  --improve-border: #fde68a;
+  --improve-text: #78350f;
+  --high-bg: #dcfce7;
+  --high-text: #166534;
+  --medium-bg: #fef3c7;
+  --medium-text: #92400e;
+  --low-bg: #fee2e2;
+  --low-text: #991b1b;
+  --option-border: #fcd34d;
+  --option-hover: #b45309;
+  --chart-grid: #e7e0d4;
+  --chart-min: #1d4e89;
+  --chart-median: #c2410c;
+  --chart-avg: #166534;
+  color: var(--text);
+  background: var(--bg);
   font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   line-height: 1.45;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1c1917;
+  --text: #faf6f1;
+  --muted: #a8a29e;
+  --subtle: #a8a29e;
+  --faint: #78716c;
+  --panel: #292524;
+  --card: #1c1917;
+  --surface: #0c0a09;
+  --hint: #1c1917;
+  --border: #44403c;
+  --border-strong: #57534e;
+  --line: #3f3a36;
+  --accent: #fdba74;
+  --accent-soft: #431407;
+  --button: #c2410c;
+  --button-text: #fff;
+  --secondary: #57534e;
+  --chip-text: #e7e5e4;
+  --strip: #9a3412;
+  --strip-edge: #292524;
+  --improve-bg: #451a03;
+  --improve-border: #92400e;
+  --improve-text: #fde68a;
+  --high-bg: #14532d;
+  --high-text: #bbf7d0;
+  --medium-bg: #78350f;
+  --medium-text: #fde68a;
+  --low-bg: #7f1d1d;
+  --low-text: #fecaca;
+  --option-border: #92400e;
+  --option-hover: #fdba74;
+  --chart-grid: #44403c;
+  --chart-min: #93c5fd;
+  --chart-median: #fdba74;
+  --chart-avg: #86efac;
+  color: var(--text);
+  background: var(--bg);
 }
 
 * {
@@ -24,5 +101,5 @@ button {
 }
 
 a {
-  color: #9a3412;
+  color: var(--accent);
 }

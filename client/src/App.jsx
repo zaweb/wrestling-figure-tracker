@@ -47,6 +47,14 @@ function latestSnapshot(figure) {
   ).at(-1)
 }
 
+const THEME_COLORS = { light: '#f4efe6', dark: '#1c1917' }
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', THEME_COLORS[theme])
+}
+
 async function readJson(response) {
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
@@ -70,6 +78,29 @@ export default function App() {
   const [trackError, setTrackError] = useState('')
   const [tracking, setTracking] = useState(false)
   const [listError, setListError] = useState('')
+  const [theme, setTheme] = useState(
+    () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'),
+  )
+
+  useEffect(() => {
+    if (localStorage.getItem('theme')) return undefined
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => {
+      if (localStorage.getItem('theme')) return
+      const next = media.matches ? 'dark' : 'light'
+      applyTheme(next)
+      setTheme(next)
+    }
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
+
+  function onToggleTheme() {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    localStorage.setItem('theme', next)
+    applyTheme(next)
+    setTheme(next)
+  }
   const [showCollection, setShowCollection] = useState(false)
   const [showAppraise, setShowAppraise] = useState(false)
 
@@ -188,6 +219,9 @@ export default function App() {
             onClick={() => setShowCollection((open) => !open)}
           >
             Collection
+          </button>
+          <button type="button" className="secondary" onClick={onToggleTheme}>
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
         </div>
       </header>
@@ -363,30 +397,30 @@ export default function App() {
                     <div className="chart">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={trends.history}>
-                          <CartesianGrid stroke="#e7e0d4" />
-                          <XAxis dataKey="date" />
-                          <YAxis />
+                          <CartesianGrid stroke="var(--chart-grid)" />
+                          <XAxis dataKey="date" stroke="var(--muted)" tick={{ fill: 'var(--muted)' }} />
+                          <YAxis stroke="var(--muted)" tick={{ fill: 'var(--muted)' }} />
                           <Tooltip />
-                          <Legend />
+                          <Legend wrapperStyle={{ color: 'var(--text)' }} />
                           <Line
                             type="monotone"
                             dataKey="minPrice"
                             name="Min"
-                            stroke="#1d4e89"
+                            stroke="var(--chart-min)"
                             dot
                           />
                           <Line
                             type="monotone"
                             dataKey="medianPrice"
                             name="Median"
-                            stroke="#c2410c"
+                            stroke="var(--chart-median)"
                             dot
                           />
                           <Line
                             type="monotone"
                             dataKey="avgPrice"
                             name="Average"
-                            stroke="#166534"
+                            stroke="var(--chart-avg)"
                             dot
                           />
                         </LineChart>

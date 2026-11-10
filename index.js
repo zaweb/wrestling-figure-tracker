@@ -237,7 +237,13 @@ app.post('/api/appraisals/price', async (req, res) => {
 
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(path.dirname(fileURLToPath(import.meta.url)), 'client', 'dist');
-  app.use(express.static(clientDist));
+  app.use(express.static(clientDist, {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('.webmanifest')) {
+        res.setHeader('Content-Type', 'application/manifest+json');
+      }
+    },
+  }));
   app.use((req, res, next) => {
     if (req.method !== 'GET' || req.path.startsWith('/api')) return next();
     res.sendFile(path.join(clientDist, 'index.html'));

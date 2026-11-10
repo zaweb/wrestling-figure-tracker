@@ -26,8 +26,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api/],
+        // Keep the app shell off the precache. A canceled login must not
+        // fall back to a cached copy of the page.
+        globPatterns: ['**/*.{js,css,ico,png,svg,webp,webmanifest}'],
+        navigateFallbackDenylist: [/./],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api'),

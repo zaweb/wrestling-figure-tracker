@@ -59,6 +59,10 @@ app.use(requireSitePassword);
 connectDB();
 startPriceCron();
 
+app.get('/api/session', (req, res) => {
+  res.json({ ok: true });
+});
+
 app.get('/api/figures/search', async (req, res) => {
   const { query, brand, condition } = req.query;
   console.log(`[Search Route] Received query: "${query}", brand: "${brand}", condition: "${condition}"`);

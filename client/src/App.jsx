@@ -103,10 +103,25 @@ export default function App() {
   }
   const [showCollection, setShowCollection] = useState(false)
   const [showAppraise, setShowAppraise] = useState(false)
+  const [access, setAccess] = useState('checking')
+
+  async function confirmAccess() {
+    try {
+      const response = await fetch('/api/session')
+      setAccess(response.ok ? 'ready' : 'locked')
+    } catch {
+      setAccess('locked')
+    }
+  }
 
   useEffect(() => {
-    loadTracked()
+    confirmAccess()
   }, [])
+
+  useEffect(() => {
+    if (access !== 'ready') return
+    loadTracked()
+  }, [access])
 
   useEffect(() => {
     if (!selectedId) {
@@ -197,6 +212,24 @@ export default function App() {
     ? Math.max(...pricedResults.map((figure) => figure.price))
     : null
   const resultCurrency = pricedResults[0]?.currency || 'USD'
+
+  if (access !== 'ready') {
+    return (
+      <main className="page">
+        <section className="panel">
+          <h2>{access === 'checking' ? 'Checking sign-in…' : 'Sign in required'}</h2>
+          {access === 'locked' && (
+            <>
+              <p className="empty">This app stays locked until you sign in.</p>
+              <div className="track-row">
+                <button type="button" onClick={confirmAccess}>Sign in</button>
+              </div>
+            </>
+          )}
+        </section>
+      </main>
+    )
+  }
 
   return (
     <main className="page">

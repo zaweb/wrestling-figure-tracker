@@ -104,17 +104,62 @@ export default function App() {
   const [showCollection, setShowCollection] = useState(false)
   const [showAppraise, setShowAppraise] = useState(false)
   const [access, setAccess] = useState('checking')
+  const [account, setAccount] = useState(null)
+  const [authMode, setAuthMode] = useState('signin')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
 
   async function confirmAccess() {
     try {
-      const response = await fetch('/api/session')
-      setAccess(response.ok ? 'ready' : 'locked')
+      const response = await fetch('/api/auth/me')
+      if (!response.ok) {
+        setAccount(null)
+        setAccess('locked')
+        return
+      }
+      setAccount(await response.json())
+      setAccess('ready')
     } catch {
+      setAccount(null)
       setAccess('locked')
     }
   }
 
+  async function onAuth(event) {
+    event.preventDefault()
+    setAuthBusy(true)
+    setAuthError('')
+    const path = authMode === 'create' ? '/api/auth/register' : '/api/auth/login'
+    try {
+      await readJson(await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: authEmail, password: authPassword }),
+      }))
+      setAuthPassword('')
+      await confirmAccess()
+    } catch (error) {
+      setAuthError(error.message)
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  async function signOut() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    setAccount(null)
+    setTracked([])
+    setSelectedId(null)
+    setFigures([])
+    setAccess('locked')
+  }
+
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('auth') === 'failed') {
+      setAuthError('Google sign-in did not finish. Try again.')
+    }
     confirmAccess()
   }, [])
 
@@ -220,10 +265,55 @@ export default function App() {
           <h2>{access === 'checking' ? 'Checking sign-in…' : 'Sign in required'}</h2>
           {access === 'locked' && (
             <>
-              <p className="empty">This app stays locked until you sign in.</p>
+              <p className="empty">Sign in to see your figures.</p>
+              <form className="search-form" onSubmit={onAuth}>
+                <label className="grow">
+                  Email
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    value={authEmail}
+                    onChange={(event) => setAuthEmail(event.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    autoComplete={authMode === 'create' ? 'new-password' : 'current-password'}
+                    value={authPassword}
+                    onChange={(event) => setAuthPassword(event.target.value)}
+                    required
+                    minLength={8}
+                  />
+                </label>
+                <button type="submit" disabled={authBusy}>
+                  {authBusy ? 'Working…' : authMode === 'create' ? 'Create account' : 'Sign in'}
+                </button>
+              </form>
               <div className="track-row">
-                <button type="button" onClick={confirmAccess}>Sign in</button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    setAuthMode((mode) => (mode === 'create' ? 'signin' : 'create'))
+                    setAuthError('')
+                  }}
+                >
+                  {authMode === 'create' ? 'I already have an account' : 'Create an account'}
+                </button>
+                <a className="google-signin" href="/api/auth/google">
+                  <svg viewBox="0 0 18 18" aria-hidden="true">
+                    <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" />
+                    <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" />
+                    <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" />
+                    <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
+                  </svg>
+                  Sign in with Google
+                </a>
               </div>
+              {authError && <p className="message">{authError}</p>}
             </>
           )}
         </section>
@@ -255,6 +345,10 @@ export default function App() {
           </button>
           <button type="button" className="secondary" onClick={onToggleTheme}>
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
+          {account?.email && <span className="account-email">{account.email}</span>}
+          <button type="button" className="secondary" onClick={signOut}>
+            Sign out
           </button>
         </div>
       </header>

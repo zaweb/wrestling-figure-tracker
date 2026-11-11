@@ -15,6 +15,7 @@ const SnapshotSchema = new mongoose.Schema({
 
 const TrackedFigureSchema = new mongoose.Schema(
   {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     name: { type: String, required: true }, // e.g., "Cody Rhodes"
     brand: { type: String, default: 'Mattel' }, // e.g., "Mattel", "Jazwares", "Hasbro"
     series: { type: String }, // e.g., "WWE Ultimate Edition Series 16"

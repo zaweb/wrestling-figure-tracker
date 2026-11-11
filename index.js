@@ -1,10 +1,11 @@
 // index.js
 import path from 'path';
-import { timingSafeEqual } from 'crypto';
 import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import session from 'express-session';
+import MongoStore from 'connect-mongo';
 import { connectDB } from './db.js';
 import { EBAY_API_BASE, EBAY_ENV, getEbayAppToken } from './ebayAuth.js';
 import { ebaySearchFilter, normalizeCondition } from './ebaySearch.js';
@@ -12,60 +13,39 @@ import { TrackedFigure } from './models/TrackedFigure.js';
 import { snapshotFigure, startPriceCron } from './cronJob.js';
 import { AppraisalError, appraisalStatus, findComparables, identifyFigure } from './appraisal.js';
 import Anthropic from '@anthropic-ai/sdk';
+import { registerAuthRoutes, requireUser } from './auth.js';
 
 dotenv.config();
 
-function credentialsMatch(given, expected) {
-  const left = Buffer.from(given);
-  const right = Buffer.from(expected);
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
-}
-
-function requireSitePassword(req, res, next) {
-  // Android install checks the page, manifest, and icons from Google's
-  // servers, which cannot send this login. Only the API stays locked.
-  if (!req.path.startsWith('/api')) return next();
-
-  const user = process.env.SITE_USER;
-  const password = process.env.SITE_PASSWORD;
-  if (!user || !password) return next();
-
-  const header = req.headers.authorization || '';
-  const space = header.indexOf(' ');
-  const scheme = space === -1 ? '' : header.slice(0, space);
-  const encoded = space === -1 ? '' : header.slice(space + 1);
-
-  if (scheme.toLowerCase() === 'basic' && encoded) {
-    const decoded = Buffer.from(encoded, 'base64').toString('utf8');
-    const sep = decoded.indexOf(':');
-    if (sep !== -1) {
-      const givenUser = decoded.slice(0, sep);
-      const givenPassword = decoded.slice(sep + 1);
-      if (credentialsMatch(givenUser, user) && credentialsMatch(givenPassword, password)) {
-        return next();
-      }
-    }
-  }
-
-  res.set('WWW-Authenticate', 'Basic realm="Wrestling Tracker"');
-  return res.status(401).send('Authentication required');
+if (!process.env.SESSION_SECRET) {
+  throw new Error('Set SESSION_SECRET in the environment before starting the server.');
 }
 
 const app = express();
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 app.use(cors());
 // Photo uploads arrive as base64 JSON, so appraisal routes accept larger bodies.
 app.use('/api/appraisals', express.json({ limit: '40mb' }));
 app.use(express.json());
-app.use(requireSitePassword);
+app.use(session({
+  name: 'wrestling.sid',
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({ mongoUrl: process.env.MONGO_URL }),
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 1000 * 60 * 60 * 24 * 30,
+  },
+}));
+registerAuthRoutes(app);
+app.use(requireUser);
 
 // Initialize DB and cron scheduler
 connectDB();
 startPriceCron();
-
-app.get('/api/session', (req, res) => {
-  res.json({ ok: true });
-});
 
 app.get('/api/figures/search', async (req, res) => {
   const { query, brand, condition } = req.query;
@@ -131,7 +111,7 @@ app.get('/api/figures/search', async (req, res) => {
 // 2. Get all tracked figures
 app.get('/api/tracked-figures', async (req, res) => {
   try {
-    const figures = await TrackedFigure.find().sort({ createdAt: -1 });
+    const figures = await TrackedFigure.find({ user: req.session.userId }).sort({ createdAt: -1 });
     res.json(figures);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -144,6 +124,7 @@ app.post('/api/tracked-figures', async (req, res) => {
 
   try {
     const newFigure = new TrackedFigure({
+      user: req.session.userId,
       name,
       brand,
       series,
@@ -170,7 +151,7 @@ app.get('/api/tracked-figures/:id/trends', async (req, res) => {
   const days = parseInt(req.query.days) || 30;
 
   try {
-    const figure = await TrackedFigure.findById(id);
+    const figure = await TrackedFigure.findOne({ _id: id, user: req.session.userId });
     if (!figure) return res.status(404).json({ error: 'Figure not found' });
 
     const cutoffDate = new Date();

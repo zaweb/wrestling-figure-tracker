@@ -154,7 +154,7 @@ function ListingRow({ item, label }) {
   )
 }
 
-export default function Appraise({ onClose, onTracked }) {
+export default function Appraise({ onClose, onTracked, onCollected }) {
   const [status, setStatus] = useState(null)
   const [photos, setPhotos] = useState([])
   const [activePhoto, setActivePhoto] = useState(0)
@@ -177,6 +177,12 @@ export default function Appraise({ onClose, onTracked }) {
   const [tracking, setTracking] = useState(false)
   const [trackedName, setTrackedName] = useState('')
   const [trackError, setTrackError] = useState('')
+  const [trackedId, setTrackedId] = useState(null)
+  const [collecting, setCollecting] = useState(false)
+  const [collected, setCollected] = useState(null) // null | 'added' | 'another'
+  const [collectError, setCollectError] = useState('')
+  const [paid, setPaid] = useState('')
+  const [paidTouched, setPaidTouched] = useState(false)
   const seconds = useElapsed(phaseStarted)
 
   useEffect(() => {
@@ -238,6 +244,22 @@ export default function Appraise({ onClose, onTracked }) {
   )
   const estimate = priced?.estimate
 
+  // Suggest the estimate as the price paid until the user types their own.
+  const paidValue = paidTouched
+    ? paid
+    : estimate?.value != null
+      ? String(Math.round(estimate.value * 100) / 100)
+      : ''
+
+  // Forget what was saved when the figure being appraised changes.
+  function clearSaved() {
+    setTrackedName('')
+    setTrackedId(null)
+    setCollected(null)
+    setCollectError('')
+    setPaidTouched(false)
+  }
+
   const excludedCounts = useMemo(() => {
     const counts = {}
     for (const item of priced?.excluded || []) counts[item.match] = (counts[item.match] || 0) + 1
@@ -259,7 +281,7 @@ export default function Appraise({ onClose, onTracked }) {
     setComparables(null)
     setError('')
     setPriceError('')
-    setTrackedName('')
+    clearSaved()
     setPhase('idle')
   }
 
@@ -268,7 +290,7 @@ export default function Appraise({ onClose, onTracked }) {
     setPhaseStarted(Date.now())
     setPriceError('')
     setComparables(null)
-    setTrackedName('')
+    clearSaved()
     try {
       setComparables(await postJson('/api/appraisals/price', { candidate: choice, query: searchQuery }))
     } catch (err) {
@@ -286,7 +308,7 @@ export default function Appraise({ onClose, onTracked }) {
     setResult(null)
     setComparables(null)
     setPriceError('')
-    setTrackedName('')
+    clearSaved()
     let data
     try {
       data = await postJson('/api/appraisals/identify', {
@@ -323,23 +345,51 @@ export default function Appraise({ onClose, onTracked }) {
     findPrices(choice, choice.ebaySearchQuery)
   }
 
+  // Saves the figure to the watchlist once and returns its id.
+  async function ensureTracked() {
+    if (trackedId) return trackedId
+    const created = await postJson('/api/tracked-figures', {
+      name: candidate.name,
+      brand: candidate.manufacturer,
+      series: [candidate.line, candidate.series, candidate.variant, candidate.year].filter(Boolean).join(' · '),
+      searchKeywords: query,
+      condition: TRACK_CONDITION[packaging] || 'ALL',
+    })
+    setTrackedId(created._id)
+    setTrackedName(candidate.name)
+    onTracked?.(created._id)
+    return created._id
+  }
+
   async function track() {
     setTracking(true)
     setTrackError('')
     try {
-      const created = await postJson('/api/tracked-figures', {
-        name: candidate.name,
-        brand: candidate.manufacturer,
-        series: [candidate.line, candidate.series, candidate.variant, candidate.year].filter(Boolean).join(' · '),
-        searchKeywords: query,
-        condition: TRACK_CONDITION[packaging] || 'ALL',
-      })
-      setTrackedName(candidate.name)
-      onTracked?.(created._id)
+      await ensureTracked()
     } catch (err) {
       setTrackError(err.message)
     } finally {
       setTracking(false)
+    }
+  }
+
+  async function addToCollection() {
+    setCollecting(true)
+    setCollectError('')
+    try {
+      const trackedFigureId = await ensureTracked()
+      const data = await postJson('/api/collection', {
+        trackedFigureId,
+        grade,
+        packaging,
+        purchasePrice: paidValue.trim(),
+      })
+      setCollected(data.created ? 'added' : 'another')
+      onCollected?.()
+    } catch (err) {
+      setCollectError(err.message)
+    } finally {
+      setCollecting(false)
     }
   }
 
@@ -733,11 +783,50 @@ export default function Appraise({ onClose, onTracked }) {
                 {result.notes && <p className="meta small">{result.notes}</p>}
 
                 <div className="final-actions">
-                  <button type="button" onClick={track} disabled={tracking || !!trackedName || busy}>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={track}
+                    disabled={tracking || collecting || !!trackedName || busy}
+                  >
                     {trackedName ? '✓ Tracking' : tracking ? 'Saving…' : 'Track this figure'}
                   </button>
-                  {trackedName && <span className="meta small">Added to your watchlist below.</span>}
+                  {trackedName && <span className="meta small">Added to your watchlist.</span>}
                   {trackError && <span className="message">{trackError}</span>}
+                </div>
+                <div className="final-actions">
+                  <label>
+                    Price paid (each)
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={paidValue}
+                      placeholder="Optional"
+                      onChange={(event) => {
+                        setPaid(event.target.value)
+                        setPaidTouched(true)
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addToCollection}
+                    disabled={collecting || tracking || !!collected || busy}
+                  >
+                    {collected ? '✓ In Collection' : collecting ? 'Adding…' : 'Add to Collection'}
+                  </button>
+                  {!collected && (
+                    <span className="meta small">
+                      Saves C{grade}, {PACKAGING.find((option) => option.id === packaging)?.label.toLowerCase()}
+                      {!paidTouched && estimate ? '. Price paid starts at the estimate; change or clear it.' : '.'}
+                    </span>
+                  )}
+                  {collected === 'added' && <span className="meta small">Added to your Collection.</span>}
+                  {collected === 'another' && (
+                    <span className="meta small">Already in your Collection, so its quantity went up by 1.</span>
+                  )}
+                  {collectError && <span className="message">{collectError}</span>}
                 </div>
               </>
             )}

@@ -14,6 +14,7 @@ import { snapshotFigure, startPriceCron } from './cronJob.js';
 import { AppraisalError, appraisalStatus, findComparables, identifyFigure } from './appraisal.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { registerAuthRoutes, requireUser } from './auth.js';
+import { ownedByFigure, registerCollectionRoutes } from './collection.js';
 
 dotenv.config();
 
@@ -111,8 +112,14 @@ app.get('/api/figures/search', async (req, res) => {
 // 2. Get all tracked figures
 app.get('/api/tracked-figures', async (req, res) => {
   try {
-    const figures = await TrackedFigure.find({ user: req.session.userId }).sort({ createdAt: -1 });
-    res.json(figures);
+    const [figures, owned] = await Promise.all([
+      TrackedFigure.find({ user: req.session.userId }).sort({ createdAt: -1 }),
+      ownedByFigure(req.session.userId),
+    ]);
+    res.json(figures.map((figure) => ({
+      ...figure.toObject(),
+      collection: owned.get(String(figure._id)) || null,
+    })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -179,7 +186,10 @@ app.get('/api/tracked-figures/:id/trends', async (req, res) => {
   }
 });
 
-// 5. Identify and price a figure from photos
+// 5. Collection: figures the user owns and their total worth
+registerCollectionRoutes(app);
+
+// 6. Identify and price a figure from photos
 function sendAppraisalError(res, label, err) {
   if (err instanceof AppraisalError) {
     console.warn(`[Appraisal] ${label} failed: ${err.message}`);

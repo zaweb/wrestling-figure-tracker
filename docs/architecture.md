@@ -1,12 +1,12 @@
 # Wrestling Figure Tracker architecture
 
-As of Nov 20, 2026
+As of Nov 21, 2026
 
 ## Summary
 
-The app has two parts. One Express server holds the API, sign-in, a daily eBay price job and the Claude photo appraisal. A React + Vite progressive web app in `client/` talks to it over `/api`. MongoDB stores users, sessions and tracked figures, eBay's Browse API supplies every price, and Claude identifies and grades figures from photos.
+The app has two parts. One Express server holds the API, sign-in, a daily eBay price job and the Claude photo appraisal. A React + Vite progressive web app in `client/` talks to it over `/api`. MongoDB stores users, sessions, watched figures and the figures each user owns, eBay's Browse API supplies every price, and Claude identifies and grades figures from photos.
 
-This describes the `main` branch up to the commit "Enable user logins, including Google auth". It covers the code as written, not a running deployment.
+This describes the code up to the Watchlist/Collection split. It covers the code as written, not a running deployment.
 
 ## How the parts fit
 
@@ -14,6 +14,7 @@ This describes the `main` branch up to the commit "Enable user logins, including
 flowchart LR
   subgraph Client["React PWA (client/)"]
     App["App.jsx<br/>search, watchlist"]
+    Collection["Collection.jsx<br/>owned figures, total worth"]
     Appraise["Appraise.jsx<br/>photo panel"]
     Estimate["estimate.js<br/>price estimate"]
   end
@@ -21,6 +22,7 @@ flowchart LR
   subgraph Server["Express server (index.js)"]
     Auth["auth.js<br/>sessions, password, Google"]
     Routes["API routes<br/>search, watchlist, trends"]
+    CollectionRoutes["collection.js<br/>owned figures, totals"]
     Appraisal["appraisal.js<br/>identify, grade, comps"]
     Cron["cronJob.js<br/>daily snapshot at midnight"]
     EbayAuth["ebayAuth.js<br/>cached eBay app token"]
@@ -34,6 +36,7 @@ flowchart LR
   Client -- "/api + session cookie" --> Server
   Auth --> Google
   Routes --> Mongo
+  CollectionRoutes --> Mongo
   Appraisal --> Claude
   Cron --> Ebay
   EbayAuth --> Ebay
@@ -67,29 +70,33 @@ Server files sit at the repo root; the client is a separate npm package in `clie
 | --- | --- |
 | `index.js` | Entry point. Middleware, sessions, all non-auth routes, starts the DB connection and the cron job, serves `client/dist` in production |
 | `auth.js` | Register, login, logout, `/me`, Google OAuth. `requireUser` guards every `/api` route except `/api/auth/*` |
+| `collection.js` | Collection routes, the total-worth calculation, and which watched figures are owned |
 | `db.js` | Mongoose connection from `MONGO_URL`; exits the process on failure |
 | `ebayAuth.js` | Picks sandbox or production from `EBAY_ENV`, rejects mismatched keys, caches the app token |
 | `ebaySearch.js` | eBay condition IDs and the search filter (fixed-price only) |
 | `cronJob.js` | `snapshotFigure()` and the daily job that snapshots every tracked figure |
 | `utils/priceCalculator.js` | Min, max, average and median from a list of listings |
 | `appraisal.js` | Photo pipeline: identify and grade with Claude, then search eBay and have Claude judge each listing |
-| `models/User.js`, `models/TrackedFigure.js` | Mongoose schemas |
+| `models/User.js`, `models/TrackedFigure.js`, `models/CollectionItem.js` | Mongoose schemas |
 | `testEbay.js` | Manual script that checks eBay credentials and search |
 | `handoff.md`, `docs/usage.txt` | Design notes for photo appraisal; local run commands |
 | `client/src/main.jsx` | React root, registers the service worker |
-| `client/src/App.jsx` | Main UI: sign-in, search, watchlist, trend charts, theme |
+| `client/src/App.jsx` | Main UI: sign-in, Watchlist/Collection switch, search, watchlist, trend charts, theme |
+| `client/src/Collection.jsx` | Collection screen: total worth (median first), owned figures and their details |
+| `client/src/shared.js` | Money and condition formatting, JSON fetch helpers |
 | `client/src/Appraise.jsx` | Add Figure panel: photo upload, candidates, grade, comps |
 | `client/src/estimate.js` | Price estimate from judged listings, computed in the browser |
 | `client/vite.config.js` | PWA manifest, Workbox rules, dev proxy `/api` to port 5001 |
 
 ## Data model and storage
 
-Two Mongo collections hold the data, and each figure's price history lives inside the figure's own document.
+Three Mongo collections hold the data. Each figure's price history lives inside the figure's own document, and owned figures point at a watched figure rather than copying its prices.
 
 | Model | Fields | Notes |
 | --- | --- | --- |
 | `User` | email (unique, lowercased), passwordHash (optional), googleId (unique, sparse), name, timestamps | A user can have a password, a Google ID or both |
 | `TrackedFigure` | user (ref to User, indexed), name, brand (default Mattel), series, searchKeywords, condition, snapshots[], timestamps | condition is an eBay condition ID: ALL, 1000, 1500, 3000, 4000, 5000 or 6000 |
+| `CollectionItem` | user, trackedFigure (ref), quantity (default 1), purchasePrice (per figure), acquiredAt, notes, grade (1–10), packaging (loose, opened_with_packaging, sealed), timestamps | One per user and figure (unique index). Adding the same figure again raises the quantity |
 | Snapshot (embedded) | date, listingCount, minPrice, maxPrice, avgPrice, medianPrice | At most one per UTC day; a second run that day overwrites it |
 | Sessions | managed by connect-mongo | 30-day cookie, httpOnly, sameSite lax, secure in production |
 
@@ -107,14 +114,22 @@ Every `/api` route except `/api/auth/*` returns 401 without a session, and every
 | `GET /api/auth/google` → `/google/callback` | OAuth code flow with a state check; links an existing account by email or creates one |
 | `GET /api/auth/me`, `POST /logout` | Returns the current user; destroys the session |
 | `GET /api/figures/search` | Searches eBay (brand + query, condition filter, fixed price) and returns the top 20 listings |
-| `GET /api/tracked-figures` | The user's watchlist, newest first |
+| `GET /api/tracked-figures` | The user's watchlist, newest first. Each figure has `collection: { itemId, quantity }` or null |
 | `POST /api/tracked-figures` | Saves a figure, then takes its first price snapshot right away |
 | `GET /api/tracked-figures/:id/trends?days=30` | Snapshot history in the window, shaped for Recharts |
+| `GET /api/collection` | The user's owned figures, each with its figure's latest snapshot and value (snapshot × quantity), plus totals |
+| `POST /api/collection` | `{ trackedFigureId, quantity?, purchasePrice?, acquiredAt?, notes?, grade?, packaging? }`. The figure must be on the user's watchlist. If it's already owned, raises the quantity and leaves the other details alone |
+| `PATCH /api/collection/:id` | Changes any of those details; sending `null` or `""` clears one |
+| `DELETE /api/collection/:id` | Removes the item. The figure stays on the watchlist |
 | `GET /api/appraisals/status` | Whether a Claude key is set and whether eBay is flagged as mocked |
 | `POST /api/appraisals/identify` | Claude (high effort) returns ranked candidates, stamp text, a C1–C10 grade, flaws, quick questions and photo requests |
 | `POST /api/appraisals/price` | Searches eBay for the chosen candidate (widens the search under 10 hits); Claude (low effort) labels each listing's match and packaging |
 
 The daily job runs at midnight server time. It loops over every tracked figure for all users, searches eBay (up to 50 listings) and saves the day's min, max, average and median.
+
+The Collection's total worth adds up each owned figure's latest min, median, average and max asking price times its quantity. Figures with no snapshot yet are left out and counted separately. Total paid and gain/loss (median value minus price paid) only include figures with a price paid. The daily job keeps these values current because owned figures are always watched figures. There is no way to delete a watched figure yet.
+
+The Add Figure panel can add the appraised figure to the Collection directly. It saves the figure to the watchlist if needed, then stores the chosen grade and packaging, with the estimate filled in as the price paid until the user changes or clears it.
 
 The appraisal estimate is computed in the browser by `estimate.js`. It uses same-figure listings in the same packaging, takes the 25th–75th percentile as the range and places the estimate within it by grade, so changing packaging or grade updates the price with no new request.
 

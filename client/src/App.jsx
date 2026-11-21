@@ -11,30 +11,10 @@ import {
 } from 'recharts'
 import './App.css'
 import Appraise from './Appraise.jsx'
+import Collection from './Collection.jsx'
+import { CONDITIONS, conditionLabel, money, readJson, sendJson } from './shared.js'
 
 const BRANDS = ['', 'Mattel', 'Jazwares', 'Hasbro', 'LJN']
-
-const CONDITIONS = [
-  { id: 'ALL', label: 'All' },
-  { id: '1000', label: 'New' },
-  { id: '1500', label: 'New other' },
-  { id: '3000', label: 'Used' },
-  { id: '4000', label: 'Very Good' },
-  { id: '5000', label: 'Good' },
-  { id: '6000', label: 'Acceptable' },
-]
-
-function conditionLabel(id) {
-  return CONDITIONS.find((condition) => condition.id === id)?.label || 'All'
-}
-
-function money(value, currency = 'USD') {
-  if (value == null || Number.isNaN(Number(value))) return '—'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(Number(value))
-}
 
 function searchKeywordsFor(query, brand) {
   return brand ? `${brand} ${query}` : query
@@ -53,14 +33,6 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = theme
   const meta = document.querySelector('meta[name="theme-color"]')
   if (meta) meta.setAttribute('content', THEME_COLORS[theme])
-}
-
-async function readJson(response) {
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    throw new Error(data.error || `Request failed (${response.status})`)
-  }
-  return data
 }
 
 export default function App() {
@@ -101,7 +73,10 @@ export default function App() {
     applyTheme(next)
     setTheme(next)
   }
-  const [showCollection, setShowCollection] = useState(false)
+  const [view, setView] = useState('watchlist') // watchlist | collection
+  const [collectionVersion, setCollectionVersion] = useState(0)
+  const [collectingId, setCollectingId] = useState(null)
+  const [collectError, setCollectError] = useState('')
   const [showAppraise, setShowAppraise] = useState(false)
   const [access, setAccess] = useState('checking')
   const [account, setAccount] = useState(null)
@@ -153,6 +128,7 @@ export default function App() {
     setTracked([])
     setSelectedId(null)
     setFigures([])
+    setView('watchlist')
     setAccess('locked')
   }
 
@@ -219,6 +195,31 @@ export default function App() {
     } finally {
       setSearching(false)
     }
+  }
+
+  async function addToCollection(figureId) {
+    setCollectingId(figureId)
+    setCollectError('')
+    try {
+      await sendJson('/api/collection', 'POST', { trackedFigureId: figureId })
+      await loadTracked()
+      setCollectionVersion((version) => version + 1)
+    } catch (error) {
+      setCollectError(error.message)
+    } finally {
+      setCollectingId(null)
+    }
+  }
+
+  // Called after the Add Figure panel or the Collection screen changes the Collection.
+  function onCollectionChanged() {
+    loadTracked()
+    setCollectionVersion((version) => version + 1)
+  }
+
+  function showFigure(figureId) {
+    setSelectedId(figureId)
+    setView('watchlist')
   }
 
   async function onTrack() {
@@ -326,7 +327,7 @@ export default function App() {
       <header className="header">
         <div>
           <h1>Wrestling Figure Tracker</h1>
-          <p>Search current eBay listings, then save a search to watch its prices.</p>
+          <p>Watch figure prices on eBay, and track what the figures you own are worth.</p>
         </div>
         <div className="header-actions">
           <button
@@ -336,13 +337,26 @@ export default function App() {
           >
             Add Figure
           </button>
-          <button
-            type="button"
-            className={showCollection ? 'secondary selected' : 'secondary'}
-            onClick={() => setShowCollection((open) => !open)}
-          >
-            Collection
-          </button>
+          <div className="view-switch" role="tablist" aria-label="Screen">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'watchlist'}
+              className={view === 'watchlist' ? 'secondary selected' : 'secondary'}
+              onClick={() => setView('watchlist')}
+            >
+              Watchlist
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'collection'}
+              className={view === 'collection' ? 'secondary selected' : 'secondary'}
+              onClick={() => setView('collection')}
+            >
+              Collection
+            </button>
+          </div>
           <button type="button" className="secondary" onClick={onToggleTheme}>
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
@@ -354,212 +368,229 @@ export default function App() {
       </header>
 
       {showAppraise && (
-        <Appraise onClose={() => setShowAppraise(false)} onTracked={(id) => loadTracked(id)} />
+        <Appraise
+          onClose={() => setShowAppraise(false)}
+          onTracked={(id) => loadTracked(id)}
+          onCollected={onCollectionChanged}
+        />
       )}
 
-      {showCollection && (
-        <section className="panel">
-          <h2>Collection</h2>
-          <p className="empty">Pictures you save will be kept with your account.</p>
-        </section>
+      {view === 'collection' && (
+        <Collection version={collectionVersion} onChanged={() => loadTracked()} onShowFigure={showFigure} />
       )}
 
-      <section className="panel">
-        <h2>Search</h2>
-        <form className="search-form" onSubmit={onSearch}>
-          <label className="grow">
-            Figure
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cody Rhodes"
-            />
-          </label>
-          <label>
-            Brand
-            <select value={brand} onChange={(event) => setBrand(event.target.value)}>
-              {BRANDS.map((option) => (
-                <option key={option || 'any'} value={option}>
-                  {option || 'Any'}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Condition
-            <select value={condition} onChange={(event) => setCondition(event.target.value)}>
-              {CONDITIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="submit" disabled={searching}>
-            {searching ? 'Searching…' : 'Search'}
-          </button>
-        </form>
-        <div className="track-row">
-          <button
-            type="button"
-            className="secondary"
-            onClick={onTrack}
-            disabled={tracking || !query.trim()}
-          >
-            {tracking ? 'Saving…' : 'Track this search'}
-          </button>
-        </div>
-        {searchError && <p className="message">{searchError}</p>}
-        {trackError && <p className="message">{trackError}</p>}
-        {total != null && !searchError && (
-          <p className="meta">
-            {`Showing ${figures.length} of ${total} listings${
-              query.trim() ? ` for “${searchKeywordsFor(query.trim(), brand)}”` : ''
-            }.`}
-          </p>
-        )}
-        {cheapest != null && (
-          <dl className="stats">
-            <div>
-              <dt>Cheapest</dt>
-              <dd>{money(cheapest, resultCurrency)}</dd>
+      {view === 'watchlist' && (
+        <>
+          <section className="panel">
+            <h2>Search</h2>
+            <form className="search-form" onSubmit={onSearch}>
+              <label className="grow">
+                Figure
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Cody Rhodes"
+                />
+              </label>
+              <label>
+                Brand
+                <select value={brand} onChange={(event) => setBrand(event.target.value)}>
+                  {BRANDS.map((option) => (
+                    <option key={option || 'any'} value={option}>
+                      {option || 'Any'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Condition
+                <select value={condition} onChange={(event) => setCondition(event.target.value)}>
+                  {CONDITIONS.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="submit" disabled={searching}>
+                {searching ? 'Searching…' : 'Search'}
+              </button>
+            </form>
+            <div className="track-row">
+              <button
+                type="button"
+                className="secondary"
+                onClick={onTrack}
+                disabled={tracking || !query.trim()}
+              >
+                {tracking ? 'Saving…' : 'Track this search'}
+              </button>
             </div>
-            <div>
-              <dt>Most expensive</dt>
-              <dd>{money(mostExpensive, resultCurrency)}</dd>
-            </div>
-          </dl>
-        )}
-        {figures.length > 0 && (
-          <ul className="cards">
-            {figures.map((figure) => (
-              <li className="card" key={figure.id}>
-                {figure.imageUrl ? (
-                  <img src={figure.imageUrl} alt="" />
-                ) : (
-                  <div className="placeholder">No image</div>
-                )}
-                <h3>{figure.title}</h3>
-                <p className="price">{money(figure.price, figure.currency || 'USD')}</p>
-                {figure.condition && <p className="condition">{figure.condition}</p>}
-                {figure.itemUrl && (
-                  <a href={figure.itemUrl} target="_blank" rel="noreferrer">
-                    View on eBay
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="panel">
-        <h2>Watchlist</h2>
-        {listError && <p className="message">{listError}</p>}
-        {tracked.length === 0 && !listError ? (
-          <p className="empty">No tracked figures yet. Search for one and save it.</p>
-        ) : (
-          <div className="watch-layout">
-            <ul className="watch-list">
-              {tracked.map((figure) => {
-                const latest = latestSnapshot(figure)
-                return (
-                  <li key={figure._id}>
-                    <button
-                      type="button"
-                      className={figure._id === selectedId ? 'selected' : ''}
-                      onClick={() => setSelectedId(figure._id)}
-                    >
-                      <strong>{figure.name}</strong>
-                      <span>
-                        {figure.brand || 'Any brand'}
-                        {latest
-                          ? ` · avg ${money(latest.avgPrice)}`
-                          : ' · no prices yet'}
-                      </span>
-                    </button>
+            {searchError && <p className="message">{searchError}</p>}
+            {trackError && <p className="message">{trackError}</p>}
+            {total != null && !searchError && (
+              <p className="meta">
+                {`Showing ${figures.length} of ${total} listings${
+                  query.trim() ? ` for “${searchKeywordsFor(query.trim(), brand)}”` : ''
+                }.`}
+              </p>
+            )}
+            {cheapest != null && (
+              <dl className="stats">
+                <div>
+                  <dt>Cheapest</dt>
+                  <dd>{money(cheapest, resultCurrency)}</dd>
+                </div>
+                <div>
+                  <dt>Most expensive</dt>
+                  <dd>{money(mostExpensive, resultCurrency)}</dd>
+                </div>
+              </dl>
+            )}
+            {figures.length > 0 && (
+              <ul className="cards">
+                {figures.map((figure) => (
+                  <li className="card" key={figure.id}>
+                    {figure.imageUrl ? (
+                      <img src={figure.imageUrl} alt="" />
+                    ) : (
+                      <div className="placeholder">No image</div>
+                    )}
+                    <h3>{figure.title}</h3>
+                    <p className="price">{money(figure.price, figure.currency || 'USD')}</p>
+                    {figure.condition && <p className="condition">{figure.condition}</p>}
+                    {figure.itemUrl && (
+                      <a href={figure.itemUrl} target="_blank" rel="noreferrer">
+                        View on eBay
+                      </a>
+                    )}
                   </li>
-                )
-              })}
-            </ul>
-            <div>
-              {!selected && <p className="empty">Select a figure to see its prices.</p>}
-              {selected && (
-                <>
-                  <h3>
-                    {selected.name}
-                    {selected.brand ? ` · ${selected.brand}` : ''}
-                  </h3>
-                  <p className="meta">
-                    Search: {selected.searchKeywords} · {conditionLabel(selected.condition)}
-                  </p>
-                  {snapshot ? (
-                    <dl className="stats">
-                      <div>
-                        <dt>Listings</dt>
-                        <dd>{snapshot.listingCount}</dd>
-                      </div>
-                      <div>
-                        <dt>Min</dt>
-                        <dd>{money(snapshot.minPrice)}</dd>
-                      </div>
-                      <div>
-                        <dt>Median</dt>
-                        <dd>{money(snapshot.medianPrice)}</dd>
-                      </div>
-                      <div>
-                        <dt>Average</dt>
-                        <dd>{money(snapshot.avgPrice)}</dd>
-                      </div>
-                      <div>
-                        <dt>Max</dt>
-                        <dd>{money(snapshot.maxPrice)}</dd>
-                      </div>
-                    </dl>
-                  ) : (
-                    <p className="empty">No priced listings were found for this search.</p>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="panel">
+            <h2>Watchlist</h2>
+            {listError && <p className="message">{listError}</p>}
+            {collectError && <p className="message">{collectError}</p>}
+            {tracked.length === 0 && !listError ? (
+              <p className="empty">No tracked figures yet. Search for one and save it.</p>
+            ) : (
+              <div className="watch-layout">
+                <ul className="watch-list">
+                  {tracked.map((figure) => {
+                    const latest = latestSnapshot(figure)
+                    const owned = figure.collection?.quantity || 0
+                    return (
+                      <li key={figure._id} className="watch-row">
+                        <button
+                          type="button"
+                          className={figure._id === selectedId ? 'watch-select selected' : 'watch-select'}
+                          onClick={() => setSelectedId(figure._id)}
+                        >
+                          <strong>{figure.name}</strong>
+                          <span>
+                            {figure.brand || 'Any brand'}
+                            {latest
+                              ? ` · avg ${money(latest.avgPrice)}`
+                              : ' · no prices yet'}
+                          </span>
+                          {owned > 0 && <span className="owned-tag">In Collection{owned > 1 ? ` ×${owned}` : ''}</span>}
+                        </button>
+                        <button
+                          type="button"
+                          className="watch-add"
+                          onClick={() => addToCollection(figure._id)}
+                          disabled={collectingId === figure._id}
+                          title={owned > 0 ? 'Add another copy to your Collection' : 'Add to your Collection'}
+                        >
+                          {collectingId === figure._id ? 'Adding…' : owned > 0 ? '+1 copy' : 'Add to Collection'}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <div>
+                  {!selected && <p className="empty">Select a figure to see its prices.</p>}
+                  {selected && (
+                    <>
+                      <h3>
+                        {selected.name}
+                        {selected.brand ? ` · ${selected.brand}` : ''}
+                      </h3>
+                      <p className="meta">
+                        Search: {selected.searchKeywords} · {conditionLabel(selected.condition)}
+                      </p>
+                      {snapshot ? (
+                        <dl className="stats">
+                          <div>
+                            <dt>Listings</dt>
+                            <dd>{snapshot.listingCount}</dd>
+                          </div>
+                          <div>
+                            <dt>Min</dt>
+                            <dd>{money(snapshot.minPrice)}</dd>
+                          </div>
+                          <div>
+                            <dt>Median</dt>
+                            <dd>{money(snapshot.medianPrice)}</dd>
+                          </div>
+                          <div>
+                            <dt>Average</dt>
+                            <dd>{money(snapshot.avgPrice)}</dd>
+                          </div>
+                          <div>
+                            <dt>Max</dt>
+                            <dd>{money(snapshot.maxPrice)}</dd>
+                          </div>
+                        </dl>
+                      ) : (
+                        <p className="empty">No priced listings were found for this search.</p>
+                      )}
+                      {trendError && <p className="message">{trendError}</p>}
+                      {trends?.history?.length > 0 && (
+                        <div className="chart">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={trends.history}>
+                              <CartesianGrid stroke="var(--chart-grid)" />
+                              <XAxis dataKey="date" stroke="var(--muted)" tick={{ fill: 'var(--muted)' }} />
+                              <YAxis stroke="var(--muted)" tick={{ fill: 'var(--muted)' }} />
+                              <Tooltip />
+                              <Legend wrapperStyle={{ color: 'var(--text)' }} />
+                              <Line
+                                type="monotone"
+                                dataKey="minPrice"
+                                name="Min"
+                                stroke="var(--chart-min)"
+                                dot
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="medianPrice"
+                                name="Median"
+                                stroke="var(--chart-median)"
+                                dot
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="avgPrice"
+                                name="Average"
+                                stroke="var(--chart-avg)"
+                                dot
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+                    </>
                   )}
-                  {trendError && <p className="message">{trendError}</p>}
-                  {trends?.history?.length > 0 && (
-                    <div className="chart">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trends.history}>
-                          <CartesianGrid stroke="var(--chart-grid)" />
-                          <XAxis dataKey="date" stroke="var(--muted)" tick={{ fill: 'var(--muted)' }} />
-                          <YAxis stroke="var(--muted)" tick={{ fill: 'var(--muted)' }} />
-                          <Tooltip />
-                          <Legend wrapperStyle={{ color: 'var(--text)' }} />
-                          <Line
-                            type="monotone"
-                            dataKey="minPrice"
-                            name="Min"
-                            stroke="var(--chart-min)"
-                            dot
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="medianPrice"
-                            name="Median"
-                            stroke="var(--chart-median)"
-                            dot
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="avgPrice"
-                            name="Average"
-                            stroke="var(--chart-avg)"
-                            dot
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
+                </div>
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </main>
   )
 }

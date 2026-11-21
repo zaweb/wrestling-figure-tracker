@@ -13,7 +13,7 @@ This describes the code up to the Watchlist/Collection split. It covers the code
 ```mermaid
 flowchart LR
   subgraph Client["React PWA (client/)"]
-    App["App.jsx<br/>search, watchlist"]
+    App["App.jsx + tabs<br/>watchlist, search, figure"]
     Collection["Collection.jsx<br/>owned figures, total worth"]
     Appraise["Appraise.jsx<br/>photo panel"]
     Estimate["estimate.js<br/>price estimate"]
@@ -81,10 +81,16 @@ Server files sit at the repo root; the client is a separate npm package in `clie
 | `testEbay.js` | Manual script that checks eBay credentials and search |
 | `handoff.md`, `docs/usage.txt` | Design notes for photo appraisal; local run commands |
 | `client/src/main.jsx` | React root, registers the service worker |
-| `client/src/App.jsx` | Main UI: sign-in, Watchlist/Collection switch, search, watchlist, trend charts, theme |
-| `client/src/Collection.jsx` | Collection screen: total worth (median first), owned figures and their details |
-| `client/src/shared.js` | Money and condition formatting, JSON fetch helpers |
-| `client/src/Appraise.jsx` | Add Figure panel: photo upload, candidates, grade, comps |
+| `client/src/App.jsx` | App shell: sign-in check, hash routes (`#/`, `#/search`, `#/collection`, `#/account`, `#/figure/:id`, `#/add`), bottom tab bar, toasts |
+| `client/src/SignIn.jsx` | Sign in and create account, email or Google |
+| `client/src/Watchlist.jsx` | Watchlist tab: rising/falling counts, filter chips, rows with sparkline and 30-day % change |
+| `client/src/FigureDetail.jsx` | One figure: median line over low–high band chart, today's listings, owned copies |
+| `client/src/Search.jsx` | Search tab: brand chips, condition, listing grid, Watch this search |
+| `client/src/Collection.jsx` | Collection tab: total worth card, sorted rows, edit sheet |
+| `client/src/Account.jsx` | Account tab: appearance (System/Light/Dark), search defaults, sign out |
+| `client/src/Appraise.jsx` | Add Figure flow in three steps: Photos, Match (live price), Save |
+| `client/src/ui.jsx`, `client/src/icons.jsx` | Shared pieces (chips, segmented control, grade picker, sheet, sparkline) and icons |
+| `client/src/shared.js` | Money, dates, price-move math, theme and search-default helpers, JSON fetch helpers |
 | `client/src/estimate.js` | Price estimate from judged listings, computed in the browser |
 | `client/vite.config.js` | PWA manifest, Workbox rules, dev proxy `/api` to port 5001 |
 

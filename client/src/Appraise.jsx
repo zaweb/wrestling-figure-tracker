@@ -113,7 +113,7 @@ function ListingRow({ item, label }) {
   )
 }
 
-export default function Appraise({ back, go, notify, reloadTracked, onCollectionChanged }) {
+export default function Appraise({ back, go, notify, reloadTracked, onCollectionChanged, isDesktop }) {
   const [step, setStep] = useState('photos') // photos | match
   const [firstPass, setFirstPass] = useState(false)
   const [saveOpen, setSaveOpen] = useState(false)
@@ -503,8 +503,8 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
           )}
         </header>
 
-        <div className="flow-body">
-          <div>
+        <div className="flow-body flow-photos">
+          <div className="photos-intro">
             <h1 className="poster">Add a figure</h1>
             <p className="lede">One photo is enough. A back view and the maker's stamp make the match surer.</p>
           </div>
@@ -520,13 +520,24 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
               <span className="drop-icon">
                 <CameraIcon size={34} />
               </span>
-              <label htmlFor={CAMERA_INPUT_ID} className="btn primary big">
-                Take a photo
-              </label>
-              <label htmlFor={FILE_INPUT_ID} className="text-link big">
-                Choose from library
-              </label>
-              <span className="muted small">You can also drop or paste a photo here.</span>
+              {isDesktop ? (
+                <>
+                  <label htmlFor={FILE_INPUT_ID} className="btn primary big">
+                    Choose photos
+                  </label>
+                  <span className="muted small">or drag them here, or paste one with Ctrl+V / ⌘V</span>
+                </>
+              ) : (
+                <>
+                  <label htmlFor={CAMERA_INPUT_ID} className="btn primary big">
+                    Take a photo
+                  </label>
+                  <label htmlFor={FILE_INPUT_ID} className="text-link big">
+                    Choose from library
+                  </label>
+                  <span className="muted small">You can also drop or paste a photo here.</span>
+                </>
+              )}
             </div>
           ) : (
             <div className="photo-stage">
@@ -622,7 +633,7 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
         </button>
       </header>
 
-      <div className="flow-body">
+      <div className="flow-body flow-match">
         {!result.isWrestlingFigure && (
           <div className="empty-card">
             <strong>That doesn't look like a wrestling figure</strong>
@@ -635,7 +646,8 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
 
         {result.isWrestlingFigure && candidate && (
           <>
-            <div className="match-head">
+            <div className="match-col col-a">
+            <div className="match-head o1">
               <span className="match-thumb">{photos[0] ? <img src={photos[0].dataUrl} alt="" /> : <FigureSilhouette />}</span>
               <div>
                 <span className="match-eyebrow">
@@ -649,7 +661,108 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
               </div>
             </div>
 
-            <section className="card value-card">
+            <section className="card condition-card o3">
+              <button type="button" className="expander" aria-expanded={showCondition} onClick={() => setShowCondition((open) => !open)}>
+                <span>
+                  <strong>Condition: {condition.gradeLabel}</strong>
+                  <span className="muted small">
+                    {condition.flaws.length > 0
+                      ? condition.flaws.slice(0, 2).map((flaw) => flaw.description).join(' · ')
+                      : condition.summary}
+                  </span>
+                </span>
+                <ChevronDownIcon size={18} />
+              </button>
+              {showCondition && (
+                <div className="condition-more">
+                  {condition.gradeConfidence !== 'high' && (
+                    <span className="pill medium">
+                      Provisional · {result.photoCount} photo{result.photoCount === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  <p>{condition.summary}</p>
+                  {condition.flaws.length > 0 && (
+                    <ul className="flaws">
+                      {condition.flaws.map((flaw, index) => (
+                        <li key={`${flaw.location}-${index}`}>
+                          <span className={`severity ${flaw.severity}`}>{flaw.severity}</span>
+                          <span>
+                            <strong>{flaw.location}:</strong> {flaw.description}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {(condition.accessoriesSeen.length > 0 || condition.accessoriesLikelyMissing.length > 0) && (
+                    <p className="muted small">
+                      {condition.accessoriesSeen.length > 0 && `Has: ${condition.accessoriesSeen.join(', ')}. `}
+                      {condition.accessoriesLikelyMissing.length > 0 && `Likely missing: ${condition.accessoriesLikelyMissing.join(', ')}.`}
+                    </p>
+                  )}
+                  <p className="muted small">{candidate.whyItMatches}</p>
+                  {candidate.howToTellApart && <p className="muted small">{candidate.howToTellApart}</p>}
+                  {observations?.stampText && <p className="muted small">Stamp: “{observations.stampText}”</p>}
+                </div>
+              )}
+            </section>
+
+            {(result.quickQuestions.length > 0 || result.photoRequests.length > 0) && (
+              <section className="check-card o4">
+                {result.quickQuestions.map((entry) => (
+                  <div key={entry.question} className="check-q">
+                    <strong>Quick check: {entry.question}</strong>
+                    <div className="check-options">
+                      {entry.options.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          className={answers[entry.question] === option ? 'on' : ''}
+                          aria-pressed={answers[entry.question] === option}
+                          disabled={busy}
+                          onClick={() => setAnswers((current) => ({ ...current, [entry.question]: option }))}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {result.photoRequests.length > 0 && (
+                  <p className="small">A photo of {result.photoRequests.join(', or ')} would help.</p>
+                )}
+                <div className="check-options">
+                  {canRecheck && !busy && (
+                    <button type="button" className="strong" onClick={identify}>
+                      {recheckLabel}
+                    </button>
+                  )}
+                  {result.photoRequests.length > 0 && (
+                    <label htmlFor={FILE_INPUT_ID} className="plain">
+                      <ImageIcon size={16} /> Add a photo
+                    </label>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {others.length > 0 && (
+              <div className="field o5">
+                <span className="card-title small">Not this one?</span>
+                <div className="alt-chips">
+                  {others.map(({ option, index }) => (
+                    <button key={index} type="button" className="chip" disabled={busy} onClick={() => chooseCandidate(index)}>
+                      {[option.name, option.series || option.line, option.variant].filter(Boolean).join(' · ')} · {option.matchPercent}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {result.notes && <p className="muted small o7">{result.notes}</p>}
+            {trackError && <p className="error o7">{trackError}</p>}
+            </div>
+            <div className="match-col col-b">
+            <section className="card value-card o2">
               <div className="value-top">
                 <div>
                   <span className="eyebrow">
@@ -701,105 +814,8 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
               </div>
             </section>
 
-            <section className="card condition-card">
-              <button type="button" className="expander" aria-expanded={showCondition} onClick={() => setShowCondition((open) => !open)}>
-                <span>
-                  <strong>Condition: {condition.gradeLabel}</strong>
-                  <span className="muted small">
-                    {condition.flaws.length > 0
-                      ? condition.flaws.slice(0, 2).map((flaw) => flaw.description).join(' · ')
-                      : condition.summary}
-                  </span>
-                </span>
-                <ChevronDownIcon size={18} />
-              </button>
-              {showCondition && (
-                <div className="condition-more">
-                  {condition.gradeConfidence !== 'high' && (
-                    <span className="pill medium">
-                      Provisional · {result.photoCount} photo{result.photoCount === 1 ? '' : 's'}
-                    </span>
-                  )}
-                  <p>{condition.summary}</p>
-                  {condition.flaws.length > 0 && (
-                    <ul className="flaws">
-                      {condition.flaws.map((flaw, index) => (
-                        <li key={`${flaw.location}-${index}`}>
-                          <span className={`severity ${flaw.severity}`}>{flaw.severity}</span>
-                          <span>
-                            <strong>{flaw.location}:</strong> {flaw.description}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {(condition.accessoriesSeen.length > 0 || condition.accessoriesLikelyMissing.length > 0) && (
-                    <p className="muted small">
-                      {condition.accessoriesSeen.length > 0 && `Has: ${condition.accessoriesSeen.join(', ')}. `}
-                      {condition.accessoriesLikelyMissing.length > 0 && `Likely missing: ${condition.accessoriesLikelyMissing.join(', ')}.`}
-                    </p>
-                  )}
-                  <p className="muted small">{candidate.whyItMatches}</p>
-                  {candidate.howToTellApart && <p className="muted small">{candidate.howToTellApart}</p>}
-                  {observations?.stampText && <p className="muted small">Stamp: “{observations.stampText}”</p>}
-                </div>
-              )}
-            </section>
-
-            {(result.quickQuestions.length > 0 || result.photoRequests.length > 0) && (
-              <section className="check-card">
-                {result.quickQuestions.map((entry) => (
-                  <div key={entry.question} className="check-q">
-                    <strong>Quick check: {entry.question}</strong>
-                    <div className="check-options">
-                      {entry.options.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          className={answers[entry.question] === option ? 'on' : ''}
-                          aria-pressed={answers[entry.question] === option}
-                          disabled={busy}
-                          onClick={() => setAnswers((current) => ({ ...current, [entry.question]: option }))}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {result.photoRequests.length > 0 && (
-                  <p className="small">A photo of {result.photoRequests.join(', or ')} would help.</p>
-                )}
-                <div className="check-options">
-                  {canRecheck && !busy && (
-                    <button type="button" className="strong" onClick={identify}>
-                      {recheckLabel}
-                    </button>
-                  )}
-                  {result.photoRequests.length > 0 && (
-                    <label htmlFor={FILE_INPUT_ID} className="plain">
-                      <ImageIcon size={16} /> Add a photo
-                    </label>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {others.length > 0 && (
-              <div className="field">
-                <span className="card-title small">Not this one?</span>
-                <div className="alt-chips">
-                  {others.map(({ option, index }) => (
-                    <button key={index} type="button" className="chip" disabled={busy} onClick={() => chooseCandidate(index)}>
-                      {[option.name, option.series || option.line, option.variant].filter(Boolean).join(' · ')} · {option.matchPercent}%
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {comparables && (
-              <details className="card listings">
+              <details className="card listings o6">
                 <summary>
                   <span>
                     Listings used ({priced.comps.length}) · left out {priced.excluded.length}
@@ -849,8 +865,7 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
               </details>
             )}
 
-            {result.notes && <p className="muted small">{result.notes}</p>}
-            {trackError && <p className="error">{trackError}</p>}
+            </div>
           </>
         )}
       </div>

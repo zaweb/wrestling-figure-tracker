@@ -25,7 +25,7 @@ function rowFor(figure) {
   }
 }
 
-export default function Watchlist({ tracked, error }) {
+export default function Watchlist({ tracked, error, isDesktop, go }) {
   const [filter, setFilter] = useState('All')
   const [sort, setSort] = useState('newest')
   const [sortOpen, setSortOpen] = useState(false)
@@ -67,7 +67,7 @@ export default function Watchlist({ tracked, error }) {
 
   return (
     <main className="screen">
-      <header className="screen-head">
+      <header className="screen-head watch-head">
         <div className="title-row">
           <div>
             <p className="kicker">
@@ -140,31 +140,83 @@ export default function Watchlist({ tracked, error }) {
 
       {rows.length > 0 && shown.length === 0 && <p className="empty-line">No figures match this filter.</p>}
 
-      <ul className="rows">
-        {shown.map(({ figure, move, owned, dir, price, sub }) => (
-          <li key={figure._id}>
-            <a className="row" href={`#/figure/${figure._id}`}>
-              <span className="thumb">
-                <FigureSilhouette />
-              </span>
-              <span className="row-main">
-                <span className="row-name">{figure.name}</span>
-                <span className="row-sub">{sub}</span>
-                {owned > 0 && <span className="owned-tag">Owned{owned > 1 ? ` ×${owned}` : ''}</span>}
-              </span>
-              <span className="row-side">
-                <Sparkline points={move?.points} dir={dir} />
-                <span className="row-price">{price != null ? money(price) : '—'}</span>
-                {move && move.points.length > 1 ? (
-                  <Delta value={move.percent}>{signedPercent(move.percent)}</Delta>
-                ) : (
-                  <span className="delta flat">{price != null ? 'New' : 'No price'}</span>
-                )}
-              </span>
-            </a>
-          </li>
-        ))}
-      </ul>
+      {isDesktop && shown.length > 0 && (
+        <div className="table-card">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Figure</th>
+                <th scope="col" className="wide-only">Condition</th>
+                <th scope="col">Last 30 days</th>
+                <th scope="col" className="num">Median</th>
+                <th scope="col" className="num">Change</th>
+                <th scope="col" className="num wide-only">Listings</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map(({ figure, move, owned, dir, price }) => (
+                <tr key={figure._id} onClick={() => go(`#/figure/${figure._id}`)}>
+                  <td>
+                    <a className="cell-figure" href={`#/figure/${figure._id}`} onClick={(event) => event.stopPropagation()}>
+                      <span className="thumb sm">
+                        <FigureSilhouette size={22} />
+                      </span>
+                      <span className="row-main">
+                        <span className="row-name">{figure.name}</span>
+                        <span className="row-sub">
+                          {[figure.brand || 'Any brand', figure.series].filter(Boolean).join(' · ')}
+                        </span>
+                      </span>
+                      {owned > 0 && <span className="owned-tag">Owned{owned > 1 ? ` ×${owned}` : ''}</span>}
+                    </a>
+                  </td>
+                  <td className="muted wide-only">{conditionLabel(figure.condition)}</td>
+                  <td>
+                    <Sparkline points={move?.points} dir={dir} width={120} height={28} />
+                  </td>
+                  <td className="num strong">{price != null ? money(price) : '—'}</td>
+                  <td className="num">
+                    {move && move.points.length > 1 ? (
+                      <Delta value={move.percent}>{signedPercent(move.percent)}</Delta>
+                    ) : (
+                      <span className="delta flat">{price != null ? 'New' : 'No price'}</span>
+                    )}
+                  </td>
+                  <td className="num muted wide-only">{move?.last.listingCount ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!isDesktop && (
+        <ul className="rows">
+          {shown.map(({ figure, move, owned, dir, price, sub }) => (
+            <li key={figure._id}>
+              <a className="row" href={`#/figure/${figure._id}`}>
+                <span className="thumb">
+                  <FigureSilhouette />
+                </span>
+                <span className="row-main">
+                  <span className="row-name">{figure.name}</span>
+                  <span className="row-sub">{sub}</span>
+                  {owned > 0 && <span className="owned-tag">Owned{owned > 1 ? ` ×${owned}` : ''}</span>}
+                </span>
+                <span className="row-side">
+                  <Sparkline points={move?.points} dir={dir} />
+                  <span className="row-price">{price != null ? money(price) : '—'}</span>
+                  {move && move.points.length > 1 ? (
+                    <Delta value={move.percent}>{signedPercent(move.percent)}</Delta>
+                  ) : (
+                    <span className="delta flat">{price != null ? 'New' : 'No price'}</span>
+                  )}
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   )
 }

@@ -55,7 +55,7 @@ function ListingRange({ snapshot }) {
   )
 }
 
-export default function FigureDetail({ figureId, tracked, back, go, notify, onCollectionChanged }) {
+export default function FigureDetail({ figureId, tracked, back, go, notify, onCollectionChanged, isDesktop }) {
   const figure = tracked?.find((item) => item._id === figureId) || null
   const [days, setDays] = useState(90)
   const [history, setHistory] = useState(null)
@@ -162,8 +162,7 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
   const ownedWorth = ownedItem?.value?.median
   const ownedGain = paid != null && ownedWorth != null ? ownedWorth - paid * ownedItem.quantity : null
 
-  return (
-    <main className="detail">
+  const heroBlock = (
       <div className="hero">
         {photo ? <img src={photo} alt="" /> : <FigureSilhouette size={120} />}
         <button type="button" className="float-btn left" aria-label="Back" onClick={back}>
@@ -172,12 +171,15 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
         {photo && <span className="hero-tag">Latest eBay photo</span>}
       </div>
 
-      <div className="detail-body">
+  )
+  const nameBlock = (
         <div>
           <p className="kicker">{sub}</p>
           <h1 className="poster md">{figure.name}</h1>
         </div>
 
+  )
+  const priceBlock = (
         <div className="price-head">
           <div>
             <span className="eyebrow">Median asking price</span>
@@ -190,6 +192,8 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
           )}
         </div>
 
+  )
+  const chartBlock = (
         <section className="card">
           <div className="card-head">
             <span className="card-title">Price history</span>
@@ -252,6 +256,9 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
           </div>
         </section>
 
+  )
+  const listingsBlock = (
+        <>
         {latest && (
           <section className="card">
             <div className="card-head">
@@ -285,6 +292,10 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
           </section>
         )}
 
+        </>
+  )
+  const ownedBlock = (
+        <>
         {ownedQuantity > 0 && (
           <a className="owned-card" href={ownedItem ? `#/collection/${ownedItem._id}` : '#/collection'}>
             <span>
@@ -301,6 +312,9 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
           </a>
         )}
 
+        </>
+  )
+  const noteBlock = (
         <div className="search-note">
           <span>
             eBay search: “{figure.searchKeywords}” · {conditionLabel(figure.condition)}
@@ -316,9 +330,8 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
             Search again
           </button>
         </div>
-        {addError && <p className="error">{addError}</p>}
-      </div>
-
+  )
+  const actionsBlock = (
       <div className="action-bar">
         <a href={ebayUrl} target="_blank" rel="noreferrer" className="btn secondary">
           Shop on eBay
@@ -327,6 +340,47 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
           {adding ? 'Adding…' : ownedQuantity > 0 ? 'Add another copy' : 'I own this'}
         </button>
       </div>
+  )
+
+  if (isDesktop) {
+    return (
+      <main className="detail desk">
+        <button type="button" className="crumb" onClick={back}>
+          <BackIcon size={18} />
+          Back
+        </button>
+        <div className="detail-grid">
+          <div className="detail-side">
+            {heroBlock}
+            {nameBlock}
+            {priceBlock}
+            {ownedBlock}
+            {actionsBlock}
+            {noteBlock}
+            {addError && <p className="error">{addError}</p>}
+          </div>
+          <div className="detail-main">
+            {chartBlock}
+            {listingsBlock}
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  return (
+    <main className="detail">
+      {heroBlock}
+      <div className="detail-body">
+        {nameBlock}
+        {priceBlock}
+        {chartBlock}
+        {listingsBlock}
+        {ownedBlock}
+        {noteBlock}
+        {addError && <p className="error">{addError}</p>}
+      </div>
+      {actionsBlock}
     </main>
   )
 }

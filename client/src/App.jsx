@@ -8,6 +8,7 @@ import Search from './Search.jsx'
 import SignIn from './SignIn.jsx'
 import Watchlist from './Watchlist.jsx'
 import { CameraIcon, EyeIcon, PersonIcon, SearchIcon, StackIcon } from './icons.jsx'
+import { useIsDesktop } from './ui.jsx'
 import { applyTheme, readJson, storedThemeMode } from './shared.js'
 
 // Hash routes keep the phone's back gesture working without a router library:
@@ -26,6 +27,44 @@ const TABS = [
   { name: 'collection', href: '#/collection', label: 'Collection', Icon: StackIcon },
   { name: 'account', href: '#/account', label: 'Account', Icon: PersonIcon },
 ]
+
+function Sidebar({ current, account }) {
+  return (
+    <aside className="sidebar">
+      <a href="#/" className="brand">
+        <span className="brand-mark" aria-hidden="true">
+          <CameraIcon size={20} />
+        </span>
+        <span className="brand-name">Figure Tracker</span>
+      </a>
+      <a href="#/add" className={`btn primary side-add${current === 'add' ? ' on' : ''}`}>
+        <CameraIcon size={20} />
+        Add a figure
+      </a>
+      <nav aria-label="Main" className="side-nav">
+        {TABS.filter((tab) => tab.name !== 'add').map((tab) => (
+          <a
+            key={tab.name}
+            href={tab.href}
+            className={`side-link${current === tab.name ? ' on' : ''}`}
+            aria-current={current === tab.name ? 'page' : undefined}
+          >
+            <tab.Icon size={20} />
+            {tab.label}
+          </a>
+        ))}
+      </nav>
+      {account?.email && (
+        <a href="#/account" className="side-account">
+          <span className="avatar sm" aria-hidden="true">
+            {(account.name || account.email).trim().charAt(0).toUpperCase()}
+          </span>
+          <span className="side-email">{account.email}</span>
+        </a>
+      )}
+    </aside>
+  )
+}
 
 function TabBar({ current }) {
   return (
@@ -60,6 +99,7 @@ export default function App() {
   const [collectionVersion, setCollectionVersion] = useState(0)
   const [themeMode, setThemeMode] = useState(storedThemeMode)
   const [toast, setToast] = useState('')
+  const isDesktop = useIsDesktop()
   const lastTab = useRef('watchlist')
   const navigated = useRef(false)
 
@@ -165,22 +205,26 @@ export default function App() {
     return <SignIn onSignedIn={confirmAccess} />
   }
 
-  const shared = { tracked, go, back, notify: setToast, reloadTracked: loadTracked, onCollectionChanged }
+  const shared = { tracked, go, back, isDesktop, notify: setToast, reloadTracked: loadTracked, onCollectionChanged }
   const fullScreen = route.name === 'add' || route.name === 'figure'
+  const sideCurrent = route.name === 'figure' ? lastTab.current : route.name
 
   return (
-    <div className={`app${fullScreen ? ' full' : ''}`}>
-      {route.name === 'watchlist' && <Watchlist {...shared} error={listError} />}
-      {route.name === 'search' && <Search {...shared} initialQuery={route.params.get('q') || ''} initialCondition={route.params.get('condition')} initialBrand={route.params.get('brand')} />}
-      {route.name === 'collection' && (
-        <Collection {...shared} version={collectionVersion} editId={route.id} />
-      )}
-      {route.name === 'account' && (
-        <Account account={account} themeMode={themeMode} onThemeChange={changeTheme} onSignOut={signOut} />
-      )}
-      {route.name === 'figure' && <FigureDetail key={route.id} {...shared} figureId={route.id} />}
-      {route.name === 'add' && <Appraise {...shared} />}
-      {!fullScreen && <TabBar current={route.name} />}
+    <div className={`app${fullScreen ? ' full' : ''}${isDesktop ? ' desktop' : ''}`}>
+      {isDesktop && <Sidebar current={sideCurrent} account={account} />}
+      <div className="content">
+        {route.name === 'watchlist' && <Watchlist {...shared} error={listError} />}
+        {route.name === 'search' && <Search {...shared} initialQuery={route.params.get('q') || ''} initialCondition={route.params.get('condition')} initialBrand={route.params.get('brand')} />}
+        {route.name === 'collection' && (
+          <Collection {...shared} version={collectionVersion} editId={route.id} />
+        )}
+        {route.name === 'account' && (
+          <Account account={account} themeMode={themeMode} onThemeChange={changeTheme} onSignOut={signOut} />
+        )}
+        {route.name === 'figure' && <FigureDetail key={route.id} {...shared} figureId={route.id} />}
+        {route.name === 'add' && <Appraise {...shared} />}
+      </div>
+      {!fullScreen && !isDesktop && <TabBar current={route.name} />}
       <div className="toast-slot" aria-live="polite">
         {toast && <div className="toast">{toast}</div>}
       </div>

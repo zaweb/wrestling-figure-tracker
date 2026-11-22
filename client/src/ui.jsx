@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { direction } from './shared.js'
 
 export function Sparkline({ points, dir, width = 64, height = 22 }) {
@@ -133,4 +133,21 @@ export function Sheet({ label, onClose, children, className = '' }) {
 
 export function Spinner({ className = '' }) {
   return <span className={`spinner ${className}`} aria-hidden="true" />
+}
+
+// Desktop browsers get a sidebar and multi-column screens; phones and small tablets keep the app layout.
+const DESKTOP_QUERY = '(min-width: 1024px)'
+
+function subscribeDesktop(callback) {
+  const media = window.matchMedia(DESKTOP_QUERY)
+  media.addEventListener('change', callback)
+  return () => media.removeEventListener('change', callback)
+}
+
+export function useIsDesktop() {
+  return useSyncExternalStore(
+    subscribeDesktop,
+    () => window.matchMedia(DESKTOP_QUERY).matches,
+    () => false,
+  )
 }

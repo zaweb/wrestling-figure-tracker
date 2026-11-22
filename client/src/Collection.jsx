@@ -195,7 +195,7 @@ function EditSheet({ item, onClose, onSaved, notify }) {
   )
 }
 
-export default function Collection({ version, editId, go, notify, onCollectionChanged }) {
+export default function Collection({ version, editId, go, notify, onCollectionChanged, isDesktop }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [sort, setSort] = useState('Value')
@@ -253,7 +253,68 @@ export default function Collection({ version, editId, go, notify, onCollectionCh
         </div>
       )}
 
-      {data && data.items.length > 0 && (
+      {isDesktop && data && data.items.length > 0 && (
+        <div className="collection-grid">
+          <div className="collection-side">
+            <Totals totals={data.totals} />
+          </div>
+          <div className="collection-main">
+            <div className="toolbar">
+              <Chips label="Sort" options={SORTS} value={sort} onChange={setSort} />
+              <span className="muted small">Select a figure to edit it</span>
+            </div>
+            <div className="table-card">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Figure</th>
+                    <th scope="col">Grade</th>
+                    <th scope="col" className="wide-only">Packaging</th>
+                    <th scope="col" className="num">Copies</th>
+                    <th scope="col" className="num">Paid each</th>
+                    <th scope="col" className="num">Worth</th>
+                    <th scope="col" className="num">Gain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => {
+                    const gain = gainOf(item)
+                    return (
+                      <tr key={item._id} onClick={() => go(`#/collection/${item._id}`)}>
+                        <td>
+                          <a className="cell-figure" href={`#/collection/${item._id}`} onClick={(event) => event.stopPropagation()}>
+                            <span className="thumb sm">
+                              <FigureSilhouette size={22} />
+                            </span>
+                            <span className="row-main">
+                              <span className="row-name">{item.figure.name}</span>
+                              <span className="row-sub">{[item.figure.brand, item.figure.series].filter(Boolean).join(' · ')}</span>
+                            </span>
+                          </a>
+                        </td>
+                        <td>{item.grade != null ? `C${item.grade}` : <span className="muted">—</span>}</td>
+                        <td className="wide-only">{item.packaging ? PACK_OPTIONS.find((option) => option.value === item.packaging)?.label : <span className="muted">—</span>}</td>
+                        <td className="num">{item.quantity}</td>
+                        <td className="num">{item.purchasePrice != null ? money(item.purchasePrice) : <span className="muted">—</span>}</td>
+                        <td className="num strong">{item.value ? money(item.value.median) : <span className="muted">No price yet</span>}</td>
+                        <td className="num">
+                          {!item.value || gain == null ? (
+                            <span className="gain-text">{item.value ? 'Add price paid' : '—'}</span>
+                          ) : (
+                            <span className={`gain-text ${direction(gain)}`}>{signedMoney(gain)}</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isDesktop && data && data.items.length > 0 && (
         <>
           <Totals totals={data.totals} />
           <div className="pad-x">

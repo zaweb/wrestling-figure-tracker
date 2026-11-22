@@ -1,90 +1,111 @@
-import { useEffect, useState } from 'react'
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
+import Account from './Account.jsx'
 import Appraise from './Appraise.jsx'
 import Collection from './Collection.jsx'
-import { CONDITIONS, conditionLabel, money, readJson, sendJson } from './shared.js'
+import FigureDetail from './FigureDetail.jsx'
+import Search from './Search.jsx'
+import SignIn from './SignIn.jsx'
+import Watchlist from './Watchlist.jsx'
+import { CameraIcon, EyeIcon, PersonIcon, SearchIcon, StackIcon } from './icons.jsx'
+import { applyTheme, readJson, storedThemeMode } from './shared.js'
 
-const BRANDS = ['', 'Mattel', 'Jazwares', 'Hasbro', 'LJN']
-
-function searchKeywordsFor(query, brand) {
-  return brand ? `${brand} ${query}` : query
+// Hash routes keep the phone's back gesture working without a router library:
+// #/ · #/search?q=… · #/collection · #/collection/<itemId> · #/account · #/figure/<id> · #/add
+function parseRoute() {
+  const raw = window.location.hash.replace(/^#/, '') || '/'
+  const [path, queryString = ''] = raw.split('?')
+  const parts = path.split('/').filter(Boolean)
+  return { name: parts[0] || 'watchlist', id: parts[1] || null, params: new URLSearchParams(queryString) }
 }
 
-function latestSnapshot(figure) {
-  if (!figure.snapshots?.length) return null
-  return [...figure.snapshots].sort(
-    (a, b) => new Date(a.date) - new Date(b.date),
-  ).at(-1)
-}
+const TABS = [
+  { name: 'watchlist', href: '#/', label: 'Watchlist', Icon: EyeIcon },
+  { name: 'search', href: '#/search', label: 'Search', Icon: SearchIcon },
+  { name: 'add' },
+  { name: 'collection', href: '#/collection', label: 'Collection', Icon: StackIcon },
+  { name: 'account', href: '#/account', label: 'Account', Icon: PersonIcon },
+]
 
-const THEME_COLORS = { light: '#f4efe6', dark: '#1c1917' }
-
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme
-  const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', THEME_COLORS[theme])
+function TabBar({ current }) {
+  return (
+    <nav className="tabbar" aria-label="Main">
+      {TABS.map((tab) =>
+        tab.name === 'add' ? (
+          <a key="add" href="#/add" className="tab-add" aria-label="Add a figure from a photo">
+            <CameraIcon size={28} />
+          </a>
+        ) : (
+          <a
+            key={tab.name}
+            href={tab.href}
+            className={`tab${current === tab.name ? ' on' : ''}`}
+            aria-current={current === tab.name ? 'page' : undefined}
+          >
+            <tab.Icon />
+            {tab.label}
+          </a>
+        ),
+      )}
+    </nav>
+  )
 }
 
 export default function App() {
-  const [query, setQuery] = useState('')
-  const [brand, setBrand] = useState('Mattel')
-  const [condition, setCondition] = useState('ALL')
-  const [figures, setFigures] = useState([])
-  const [total, setTotal] = useState(null)
-  const [searchError, setSearchError] = useState('')
-  const [searching, setSearching] = useState(false)
-  const [tracked, setTracked] = useState([])
-  const [selectedId, setSelectedId] = useState(null)
-  const [trends, setTrends] = useState(null)
-  const [trendError, setTrendError] = useState('')
-  const [trackError, setTrackError] = useState('')
-  const [tracking, setTracking] = useState(false)
+  const [route, setRoute] = useState(parseRoute)
+  const [access, setAccess] = useState('checking') // checking | locked | ready
+  const [account, setAccount] = useState(null)
+  const [tracked, setTracked] = useState(null)
   const [listError, setListError] = useState('')
-  const [theme, setTheme] = useState(
-    () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'),
-  )
+  const [collectionVersion, setCollectionVersion] = useState(0)
+  const [themeMode, setThemeMode] = useState(storedThemeMode)
+  const [toast, setToast] = useState('')
+  const lastTab = useRef('watchlist')
+  const navigated = useRef(false)
 
   useEffect(() => {
-    if (localStorage.getItem('theme')) return undefined
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => {
-      if (localStorage.getItem('theme')) return
-      const next = media.matches ? 'dark' : 'light'
-      applyTheme(next)
-      setTheme(next)
+    function onHash() {
+      navigated.current = true
+      setRoute(parseRoute())
+      window.scrollTo(0, 0)
     }
-    media.addEventListener('change', onChange)
-    return () => media.removeEventListener('change', onChange)
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  function onToggleTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    localStorage.setItem('theme', next)
-    applyTheme(next)
-    setTheme(next)
+  useEffect(() => {
+    if (['watchlist', 'search', 'collection', 'account'].includes(route.name)) lastTab.current = route.name
+  }, [route.name])
+
+  // Follow the device's light/dark setting while the mode is System.
+  useEffect(() => {
+    if (themeMode !== 'system') return undefined
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => applyTheme('system')
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [themeMode])
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = setTimeout(() => setToast(''), 3200)
+    return () => clearTimeout(timer)
+  }, [toast])
+
+  function changeTheme(mode) {
+    applyTheme(mode)
+    setThemeMode(mode)
   }
-  const [view, setView] = useState('watchlist') // watchlist | collection
-  const [collectionVersion, setCollectionVersion] = useState(0)
-  const [collectingId, setCollectingId] = useState(null)
-  const [collectError, setCollectError] = useState('')
-  const [showAppraise, setShowAppraise] = useState(false)
-  const [access, setAccess] = useState('checking')
-  const [account, setAccount] = useState(null)
-  const [authMode, setAuthMode] = useState('signin')
-  const [authEmail, setAuthEmail] = useState('')
-  const [authPassword, setAuthPassword] = useState('')
-  const [authError, setAuthError] = useState('')
-  const [authBusy, setAuthBusy] = useState(false)
+
+  const go = useCallback((hash) => {
+    window.location.hash = hash
+  }, [])
+
+  // Back within the app when there's history; otherwise to the last tab.
+  const back = useCallback(() => {
+    if (navigated.current && window.history.length > 1) window.history.back()
+    else window.location.hash = lastTab.current === 'watchlist' ? '#/' : `#/${lastTab.current}`
+  }, [])
 
   async function confirmAccess() {
     try {
@@ -102,495 +123,67 @@ export default function App() {
     }
   }
 
-  async function onAuth(event) {
-    event.preventDefault()
-    setAuthBusy(true)
-    setAuthError('')
-    const path = authMode === 'create' ? '/api/auth/register' : '/api/auth/login'
-    try {
-      await readJson(await fetch(path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: authEmail, password: authPassword }),
-      }))
-      setAuthPassword('')
-      await confirmAccess()
-    } catch (error) {
-      setAuthError(error.message)
-    } finally {
-      setAuthBusy(false)
-    }
-  }
-
-  async function signOut() {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    setAccount(null)
-    setTracked([])
-    setSelectedId(null)
-    setFigures([])
-    setView('watchlist')
-    setAccess('locked')
-  }
-
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('auth') === 'failed') {
-      setAuthError('Google sign-in did not finish. Try again.')
-    }
     confirmAccess()
   }, [])
 
-  useEffect(() => {
-    if (access !== 'ready') return
-    loadTracked()
-  }, [access])
-
-  useEffect(() => {
-    if (!selectedId) {
-      setTrends(null)
-      return
-    }
-
-    let cancelled = false
-    setTrendError('')
-    fetch(`/api/tracked-figures/${selectedId}/trends`)
-      .then((response) => readJson(response))
-      .then((data) => {
-        if (!cancelled) setTrends(data)
-      })
-      .catch((error) => {
-        if (!cancelled) setTrendError(error.message)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [selectedId])
-
-  async function loadTracked(selectId) {
+  const loadTracked = useCallback(async () => {
     try {
       const data = await readJson(await fetch('/api/tracked-figures'))
       setTracked(data)
       setListError('')
-      setSelectedId((current) => selectId || current || data[0]?._id || null)
+      return data
     } catch (error) {
       setListError(error.message)
+      return null
     }
-  }
+  }, [])
 
-  async function onSearch(event) {
-    event.preventDefault()
-    setSearching(true)
-    setSearchError('')
-    const params = new URLSearchParams({ query: query.trim(), condition })
-    if (brand) params.set('brand', brand)
+  useEffect(() => {
+    if (access === 'ready') loadTracked()
+  }, [access, loadTracked])
 
-    try {
-      const data = await readJson(await fetch(`/api/figures/search?${params}`))
-      setFigures(data.figures || [])
-      setTotal(data.total ?? 0)
-    } catch (error) {
-      setFigures([])
-      setTotal(null)
-      setSearchError(error.message)
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  async function addToCollection(figureId) {
-    setCollectingId(figureId)
-    setCollectError('')
-    try {
-      await sendJson('/api/collection', 'POST', { trackedFigureId: figureId })
-      await loadTracked()
-      setCollectionVersion((version) => version + 1)
-    } catch (error) {
-      setCollectError(error.message)
-    } finally {
-      setCollectingId(null)
-    }
-  }
-
-  // Called after the Add Figure panel or the Collection screen changes the Collection.
-  function onCollectionChanged() {
+  // Called whenever something changes the Collection, so owned counts stay in step.
+  const onCollectionChanged = useCallback(() => {
     loadTracked()
     setCollectionVersion((version) => version + 1)
+  }, [loadTracked])
+
+  async function signOut() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    setAccount(null)
+    setTracked(null)
+    setAccess('locked')
+    window.location.hash = '#/'
   }
 
-  function showFigure(figureId) {
-    setSelectedId(figureId)
-    setView('watchlist')
+  if (access === 'checking') {
+    return <main className="splash" aria-busy="true" />
   }
 
-  async function onTrack() {
-    setTracking(true)
-    setTrackError('')
-    const keywords = searchKeywordsFor(query.trim(), brand)
-
-    try {
-      const created = await readJson(
-        await fetch('/api/tracked-figures', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: query.trim(),
-            brand,
-            searchKeywords: keywords,
-            condition,
-          }),
-        }),
-      )
-      await loadTracked(created._id)
-    } catch (error) {
-      setTrackError(error.message)
-    } finally {
-      setTracking(false)
-    }
+  if (access === 'locked') {
+    return <SignIn onSignedIn={confirmAccess} />
   }
 
-  const selected = tracked.find((figure) => figure._id === selectedId) || null
-  const snapshot = selected ? latestSnapshot(selected) : null
-  const pricedResults = figures.filter((figure) => figure.price > 0)
-  const cheapest = pricedResults.length
-    ? Math.min(...pricedResults.map((figure) => figure.price))
-    : null
-  const mostExpensive = pricedResults.length
-    ? Math.max(...pricedResults.map((figure) => figure.price))
-    : null
-  const resultCurrency = pricedResults[0]?.currency || 'USD'
-
-  if (access !== 'ready') {
-    return (
-      <main className="page">
-        <section className="panel">
-          <h2>{access === 'checking' ? 'Checking sign-in…' : 'Sign in required'}</h2>
-          {access === 'locked' && (
-            <>
-              <p className="empty">Sign in to see your figures.</p>
-              <form className="search-form" onSubmit={onAuth}>
-                <label className="grow">
-                  Email
-                  <input
-                    type="email"
-                    autoComplete="email"
-                    value={authEmail}
-                    onChange={(event) => setAuthEmail(event.target.value)}
-                    required
-                  />
-                </label>
-                <label>
-                  Password
-                  <input
-                    type="password"
-                    autoComplete={authMode === 'create' ? 'new-password' : 'current-password'}
-                    value={authPassword}
-                    onChange={(event) => setAuthPassword(event.target.value)}
-                    required
-                    minLength={8}
-                  />
-                </label>
-                <button type="submit" disabled={authBusy}>
-                  {authBusy ? 'Working…' : authMode === 'create' ? 'Create account' : 'Sign in'}
-                </button>
-              </form>
-              <div className="track-row">
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => {
-                    setAuthMode((mode) => (mode === 'create' ? 'signin' : 'create'))
-                    setAuthError('')
-                  }}
-                >
-                  {authMode === 'create' ? 'I already have an account' : 'Create an account'}
-                </button>
-                <a className="google-signin" href="/api/auth/google">
-                  <svg viewBox="0 0 18 18" aria-hidden="true">
-                    <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" />
-                    <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" />
-                    <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" />
-                    <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
-                  </svg>
-                  Sign in with Google
-                </a>
-              </div>
-              {authError && <p className="message">{authError}</p>}
-            </>
-          )}
-        </section>
-      </main>
-    )
-  }
+  const shared = { tracked, go, back, notify: setToast, reloadTracked: loadTracked, onCollectionChanged }
+  const fullScreen = route.name === 'add' || route.name === 'figure'
 
   return (
-    <main className="page">
-      <header className="header">
-        <div>
-          <h1>Wrestling Figure Tracker</h1>
-          <p>Watch figure prices on eBay, and track what the figures you own are worth.</p>
-        </div>
-        <div className="header-actions">
-          <button
-            type="button"
-            className={showAppraise ? 'selected' : ''}
-            onClick={() => setShowAppraise((open) => !open)}
-          >
-            Add Figure
-          </button>
-          <div className="view-switch" role="tablist" aria-label="Screen">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === 'watchlist'}
-              className={view === 'watchlist' ? 'secondary selected' : 'secondary'}
-              onClick={() => setView('watchlist')}
-            >
-              Watchlist
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === 'collection'}
-              className={view === 'collection' ? 'secondary selected' : 'secondary'}
-              onClick={() => setView('collection')}
-            >
-              Collection
-            </button>
-          </div>
-          <button type="button" className="secondary" onClick={onToggleTheme}>
-            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-          </button>
-          {account?.email && <span className="account-email">{account.email}</span>}
-          <button type="button" className="secondary" onClick={signOut}>
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      {showAppraise && (
-        <Appraise
-          onClose={() => setShowAppraise(false)}
-          onTracked={(id) => loadTracked(id)}
-          onCollected={onCollectionChanged}
-        />
+    <div className={`app${fullScreen ? ' full' : ''}`}>
+      {route.name === 'watchlist' && <Watchlist {...shared} error={listError} />}
+      {route.name === 'search' && <Search {...shared} initialQuery={route.params.get('q') || ''} initialCondition={route.params.get('condition')} initialBrand={route.params.get('brand')} />}
+      {route.name === 'collection' && (
+        <Collection {...shared} version={collectionVersion} editId={route.id} />
       )}
-
-      {view === 'collection' && (
-        <Collection version={collectionVersion} onChanged={() => loadTracked()} onShowFigure={showFigure} />
+      {route.name === 'account' && (
+        <Account account={account} themeMode={themeMode} onThemeChange={changeTheme} onSignOut={signOut} />
       )}
-
-      {view === 'watchlist' && (
-        <>
-          <section className="panel">
-            <h2>Search</h2>
-            <form className="search-form" onSubmit={onSearch}>
-              <label className="grow">
-                Figure
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Cody Rhodes"
-                />
-              </label>
-              <label>
-                Brand
-                <select value={brand} onChange={(event) => setBrand(event.target.value)}>
-                  {BRANDS.map((option) => (
-                    <option key={option || 'any'} value={option}>
-                      {option || 'Any'}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Condition
-                <select value={condition} onChange={(event) => setCondition(event.target.value)}>
-                  {CONDITIONS.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="submit" disabled={searching}>
-                {searching ? 'Searching…' : 'Search'}
-              </button>
-            </form>
-            <div className="track-row">
-              <button
-                type="button"
-                className="secondary"
-                onClick={onTrack}
-                disabled={tracking || !query.trim()}
-              >
-                {tracking ? 'Saving…' : 'Track this search'}
-              </button>
-            </div>
-            {searchError && <p className="message">{searchError}</p>}
-            {trackError && <p className="message">{trackError}</p>}
-            {total != null && !searchError && (
-              <p className="meta">
-                {`Showing ${figures.length} of ${total} listings${
-                  query.trim() ? ` for “${searchKeywordsFor(query.trim(), brand)}”` : ''
-                }.`}
-              </p>
-            )}
-            {cheapest != null && (
-              <dl className="stats">
-                <div>
-                  <dt>Cheapest</dt>
-                  <dd>{money(cheapest, resultCurrency)}</dd>
-                </div>
-                <div>
-                  <dt>Most expensive</dt>
-                  <dd>{money(mostExpensive, resultCurrency)}</dd>
-                </div>
-              </dl>
-            )}
-            {figures.length > 0 && (
-              <ul className="cards">
-                {figures.map((figure) => (
-                  <li className="card" key={figure.id}>
-                    {figure.imageUrl ? (
-                      <img src={figure.imageUrl} alt="" />
-                    ) : (
-                      <div className="placeholder">No image</div>
-                    )}
-                    <h3>{figure.title}</h3>
-                    <p className="price">{money(figure.price, figure.currency || 'USD')}</p>
-                    {figure.condition && <p className="condition">{figure.condition}</p>}
-                    {figure.itemUrl && (
-                      <a href={figure.itemUrl} target="_blank" rel="noreferrer">
-                        View on eBay
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="panel">
-            <h2>Watchlist</h2>
-            {listError && <p className="message">{listError}</p>}
-            {collectError && <p className="message">{collectError}</p>}
-            {tracked.length === 0 && !listError ? (
-              <p className="empty">No tracked figures yet. Search for one and save it.</p>
-            ) : (
-              <div className="watch-layout">
-                <ul className="watch-list">
-                  {tracked.map((figure) => {
-                    const latest = latestSnapshot(figure)
-                    const owned = figure.collection?.quantity || 0
-                    return (
-                      <li key={figure._id} className="watch-row">
-                        <button
-                          type="button"
-                          className={figure._id === selectedId ? 'watch-select selected' : 'watch-select'}
-                          onClick={() => setSelectedId(figure._id)}
-                        >
-                          <strong>{figure.name}</strong>
-                          <span>
-                            {figure.brand || 'Any brand'}
-                            {latest
-                              ? ` · avg ${money(latest.avgPrice)}`
-                              : ' · no prices yet'}
-                          </span>
-                          {owned > 0 && <span className="owned-tag">In Collection{owned > 1 ? ` ×${owned}` : ''}</span>}
-                        </button>
-                        <button
-                          type="button"
-                          className="watch-add"
-                          onClick={() => addToCollection(figure._id)}
-                          disabled={collectingId === figure._id}
-                          title={owned > 0 ? 'Add another copy to your Collection' : 'Add to your Collection'}
-                        >
-                          {collectingId === figure._id ? 'Adding…' : owned > 0 ? '+1 copy' : 'Add to Collection'}
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-                <div>
-                  {!selected && <p className="empty">Select a figure to see its prices.</p>}
-                  {selected && (
-                    <>
-                      <h3>
-                        {selected.name}
-                        {selected.brand ? ` · ${selected.brand}` : ''}
-                      </h3>
-                      <p className="meta">
-                        Search: {selected.searchKeywords} · {conditionLabel(selected.condition)}
-                      </p>
-                      {snapshot ? (
-                        <dl className="stats">
-                          <div>
-                            <dt>Listings</dt>
-                            <dd>{snapshot.listingCount}</dd>
-                          </div>
-                          <div>
-                            <dt>Min</dt>
-                            <dd>{money(snapshot.minPrice)}</dd>
-                          </div>
-                          <div>
-                            <dt>Median</dt>
-                            <dd>{money(snapshot.medianPrice)}</dd>
-                          </div>
-                          <div>
-                            <dt>Average</dt>
-                            <dd>{money(snapshot.avgPrice)}</dd>
-                          </div>
-                          <div>
-                            <dt>Max</dt>
-                            <dd>{money(snapshot.maxPrice)}</dd>
-                          </div>
-                        </dl>
-                      ) : (
-                        <p className="empty">No priced listings were found for this search.</p>
-                      )}
-                      {trendError && <p className="message">{trendError}</p>}
-                      {trends?.history?.length > 0 && (
-                        <div className="chart">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={trends.history}>
-                              <CartesianGrid stroke="var(--chart-grid)" />
-                              <XAxis dataKey="date" stroke="var(--muted)" tick={{ fill: 'var(--muted)' }} />
-                              <YAxis stroke="var(--muted)" tick={{ fill: 'var(--muted)' }} />
-                              <Tooltip />
-                              <Legend wrapperStyle={{ color: 'var(--text)' }} />
-                              <Line
-                                type="monotone"
-                                dataKey="minPrice"
-                                name="Min"
-                                stroke="var(--chart-min)"
-                                dot
-                              />
-                              <Line
-                                type="monotone"
-                                dataKey="medianPrice"
-                                name="Median"
-                                stroke="var(--chart-median)"
-                                dot
-                              />
-                              <Line
-                                type="monotone"
-                                dataKey="avgPrice"
-                                name="Average"
-                                stroke="var(--chart-avg)"
-                                dot
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          </section>
-        </>
-      )}
-    </main>
+      {route.name === 'figure' && <FigureDetail key={route.id} {...shared} figureId={route.id} />}
+      {route.name === 'add' && <Appraise {...shared} />}
+      {!fullScreen && <TabBar current={route.name} />}
+      <div className="toast-slot" aria-live="polite">
+        {toast && <div className="toast">{toast}</div>}
+      </div>
+    </div>
   )
 }

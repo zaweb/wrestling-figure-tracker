@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PACKAGING } from './estimate.js'
-import { FigureSilhouette, PlusIcon } from './icons.jsx'
-import { Chips, GRADE_NAMES, GradePicker, Segmented, Sheet, Stepper } from './ui.jsx'
+import { CloseIcon, ImageIcon, PlusIcon } from './icons.jsx'
+import { MAX_PHOTOS, preparePhoto } from './preparePhoto.js'
+import { Chips, FigureThumb, GRADE_NAMES, GradePicker, PhotoViewer, Segmented, Sheet, Stepper } from './ui.jsx'
 import { direction, money, plural, readJson, sendJson, shortDate, signedMoney, wholeMoney } from './shared.js'
 
 const SORTS = ['Value', 'Gain', 'Newest'].map((label) => ({ value: label, label }))
@@ -77,6 +78,7 @@ function EditSheet({ item, onClose, onSaved, notify }) {
   const [busy, setBusy] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [error, setError] = useState('')
+  const [viewing, setViewing] = useState(null)
   const set = (key) => (value) => setDraft((current) => ({ ...current, [key]: value }))
   const gain = gainOf(item)
 
@@ -102,6 +104,40 @@ function EditSheet({ item, onClose, onSaved, notify }) {
     }
   }
 
+  async function addPhoto(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setBusy(true)
+    setError('')
+    try {
+      const photo = await preparePhoto(file)
+      await sendJson(`/api/tracked-figures/${item.figure._id}/photos`, 'POST', {
+        photos: [{ dataUrl: photo.dataUrl }],
+      })
+      await onSaved()
+      notify('Photo saved.')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function removePhoto(id) {
+    setBusy(true)
+    setError('')
+    try {
+      await sendJson(`/api/photos/${id}`, 'DELETE')
+      await onSaved()
+      notify('Photo removed.')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function remove() {
     if (!confirmRemove) {
       setConfirmRemove(true)
@@ -121,6 +157,7 @@ function EditSheet({ item, onClose, onSaved, notify }) {
   }
 
   return (
+    <>
     <Sheet label={`Edit ${item.figure.name}`} onClose={onClose}>
       <form className="sheet-form" onSubmit={save}>
         <div className="sheet-head">
@@ -170,6 +207,36 @@ function EditSheet({ item, onClose, onSaved, notify }) {
           <GradePicker value={draft.grade} onChange={set('grade')} allowClear />
         </div>
 
+        <div className="field">
+          <span>Photos</span>
+          <p className="muted small">Tap a photo to see the whole figure.</p>
+          <div className="shots gallery">
+            {(item.photos || []).map((id, index) => (
+              <div key={id} className="shot photo">
+                <button type="button" onClick={() => setViewing(id)} aria-label={`View photo ${index + 1}`}>
+                  <img src={`/api/photos/${id}`} alt="" />
+                </button>
+                <button
+                  type="button"
+                  className="shot-remove"
+                  aria-label={`Remove photo ${index + 1}`}
+                  disabled={busy}
+                  onClick={() => removePhoto(id)}
+                >
+                  <CloseIcon size={14} />
+                </button>
+              </div>
+            ))}
+            {(item.photos || []).length < MAX_PHOTOS && (
+              <label className="shot hint">
+                <ImageIcon size={18} />
+                <strong>Add a photo</strong>
+                <input type="file" accept="image/*" hidden disabled={busy} onChange={addPhoto} />
+              </label>
+            )}
+          </div>
+        </div>
+
         <label className="field">
           Notes
           <input
@@ -192,6 +259,8 @@ function EditSheet({ item, onClose, onSaved, notify }) {
         </div>
       </form>
     </Sheet>
+    {viewing && <PhotoViewer src={`/api/photos/${viewing}`} onClose={() => setViewing(null)} />}
+    </>
   )
 }
 
@@ -283,9 +352,7 @@ export default function Collection({ version, editId, go, notify, onCollectionCh
                       <tr key={item._id} onClick={() => go(`#/collection/${item._id}`)}>
                         <td>
                           <a className="cell-figure" href={`#/collection/${item._id}`} onClick={(event) => event.stopPropagation()}>
-                            <span className="thumb sm">
-                              <FigureSilhouette size={22} />
-                            </span>
+                            <FigureThumb photoId={item.photos?.[0]} small />
                             <span className="row-main">
                               <span className="row-name">{item.figure.name}</span>
                               <span className="row-sub">{[item.figure.brand, item.figure.series].filter(Boolean).join(' · ')}</span>
@@ -333,10 +400,9 @@ export default function Collection({ version, editId, go, notify, onCollectionCh
               return (
                 <li key={item._id}>
                   <a className="row" href={`#/collection/${item._id}`}>
-                    <span className="thumb">
-                      <FigureSilhouette />
+                    <FigureThumb photoId={item.photos?.[0]}>
                       {item.quantity > 1 && <span className="qty-badge">×{item.quantity}</span>}
-                    </span>
+                    </FigureThumb>
                     <span className="row-main">
                       <span className="row-name">{item.figure.name}</span>
                       <span className="row-sub">{detail.join(' · ')}</span>

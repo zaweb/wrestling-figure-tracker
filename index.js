@@ -15,6 +15,7 @@ import { AppraisalError, appraisalStatus, findComparables, identifyFigure } from
 import Anthropic from '@anthropic-ai/sdk';
 import { registerAuthRoutes, requireUser } from './auth.js';
 import { ownedByFigure, registerCollectionRoutes } from './collection.js';
+import { photosByFigure, photosConfigured, registerPhotoRoutes } from './photos.js';
 
 dotenv.config();
 
@@ -25,9 +26,14 @@ if (!process.env.SESSION_SECRET) {
 const app = express();
 if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 app.use(cors());
-// Photo uploads arrive as base64 JSON, so appraisal routes accept larger bodies.
-app.use('/api/appraisals', express.json({ limit: '40mb' }));
-app.use(express.json());
+// Photo uploads arrive as base64 JSON, so those routes accept larger bodies.
+// The photo route parses its own body; the default parser must leave that stream alone.
+const largeJson = express.json({ limit: '40mb' });
+app.use('/api/appraisals', largeJson);
+app.use((req, res, next) => {
+  if (req.method === 'POST' && /^\/api\/tracked-figures\/[a-f0-9]{24}\/photos$/i.test(req.path)) return next();
+  return express.json()(req, res, next);
+});
 app.use(session({
   name: 'wrestling.sid',
   secret: process.env.SESSION_SECRET,
@@ -112,13 +118,15 @@ app.get('/api/figures/search', async (req, res) => {
 // 2. Get all tracked figures
 app.get('/api/tracked-figures', async (req, res) => {
   try {
-    const [figures, owned] = await Promise.all([
+    const [figures, owned, photos] = await Promise.all([
       TrackedFigure.find({ user: req.session.userId }).sort({ createdAt: -1 }),
       ownedByFigure(req.session.userId),
+      photosByFigure(req.session.userId),
     ]);
     res.json(figures.map((figure) => ({
       ...figure.toObject(),
       collection: owned.get(String(figure._id)) || null,
+      photos: photos.get(String(figure._id)) || [],
     })));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -189,6 +197,9 @@ app.get('/api/tracked-figures/:id/trends', async (req, res) => {
 // 5. Collection: figures the user owns and their total worth
 registerCollectionRoutes(app);
 
+// 5b. Photos the user took, stored in Cloudflare R2
+registerPhotoRoutes(app);
+
 // 6. Identify and price a figure from photos
 function sendAppraisalError(res, label, err) {
   if (err instanceof AppraisalError) {
@@ -253,4 +264,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Wrestling Tracker server running on port ${PORT}`);
   console.log(`eBay environment: ${EBAY_ENV} (${EBAY_API_BASE})`);
+  console.log(photosConfigured() ? 'Photo storage: Cloudflare R2' : 'Photo storage: not configured');
 });

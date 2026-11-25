@@ -2,6 +2,7 @@
 // Collection routes: figures the user owns, and what they are worth at current eBay asking prices.
 import { CollectionItem, PACKAGING_VALUES } from './models/CollectionItem.js';
 import { TrackedFigure } from './models/TrackedFigure.js';
+import { photosByFigure } from './photos.js';
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -175,10 +176,14 @@ function sendError(res, err) {
 export function registerCollectionRoutes(app) {
   app.get('/api/collection', async (req, res) => {
     try {
-      const docs = await CollectionItem.find({ user: req.session.userId })
-        .sort({ createdAt: -1 })
-        .populate('trackedFigure');
-      const items = docs.filter((doc) => doc.trackedFigure).map(shapeItem);
+      const [docs, photos] = await Promise.all([
+        CollectionItem.find({ user: req.session.userId }).sort({ createdAt: -1 }).populate('trackedFigure'),
+        photosByFigure(req.session.userId),
+      ]);
+      const items = docs.filter((doc) => doc.trackedFigure).map((doc) => ({
+        ...shapeItem(doc),
+        photos: photos.get(String(doc.trackedFigure._id)) || [],
+      }));
       res.json({ items, totals: collectionTotals(items) });
     } catch (err) {
       sendError(res, err);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Area, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { BackIcon, ChevronIcon, FigureSilhouette } from './icons.jsx'
-import { Delta, Segmented, Spinner } from './ui.jsx'
+import { Delta, PhotoViewer, Segmented, Spinner } from './ui.jsx'
 import {
   conditionLabel,
   direction,
@@ -62,6 +62,8 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
   const [historyError, setHistoryError] = useState('')
   const [ownedItem, setOwnedItem] = useState(null)
   const [photo, setPhoto] = useState(null)
+  const [ownIndex, setOwnIndex] = useState(0)
+  const [viewing, setViewing] = useState(null)
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
   const ownedQuantity = figure?.collection?.quantity || 0
@@ -94,11 +96,14 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
     }
   }, [figureId, ownedQuantity])
 
-  // A current eBay photo for the header. Best effort: the silhouette stays if it fails.
+  const ownPhotos = figure?.photos || []
+  const shownOwn = ownPhotos[Math.min(ownIndex, Math.max(ownPhotos.length - 1, 0))]
+
+  // A current eBay photo for the header, used when the user has not saved one of their own.
   const keywords = figure?.searchKeywords
   const condition = figure?.condition
   useEffect(() => {
-    if (!keywords) return undefined
+    if (!keywords || ownPhotos.length > 0) return undefined
     let cancelled = false
     const params = new URLSearchParams({ query: keywords, condition: condition || 'ALL' })
     fetch(`/api/figures/search?${params}`)
@@ -111,7 +116,11 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
     return () => {
       cancelled = true
     }
-  }, [keywords, condition])
+  }, [keywords, condition, ownPhotos.length])
+
+  useEffect(() => {
+    setOwnIndex(0)
+  }, [figureId])
 
   if (!tracked) {
     return (
@@ -162,14 +171,61 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
   const ownedWorth = ownedItem?.value?.median
   const ownedGain = paid != null && ownedWorth != null ? ownedWorth - paid * ownedItem.quantity : null
 
+  async function removeOwnPhoto() {
+    if (!shownOwn) return
+    try {
+      await sendJson(`/api/photos/${shownOwn}`, 'DELETE')
+      onCollectionChanged()
+      notify('Photo removed.')
+    } catch (err) {
+      notify(err.message)
+    }
+  }
+
   const heroBlock = (
+      <>
       <div className="hero">
-        {photo ? <img src={photo} alt="" /> : <FigureSilhouette size={120} />}
+        {shownOwn ? (
+          <button type="button" className="hero-photo" onClick={() => setViewing(shownOwn)} aria-label="View the whole figure">
+            <img src={`/api/photos/${shownOwn}`} alt="" />
+          </button>
+        ) : photo ? (
+          <img src={photo} alt="" />
+        ) : (
+          <FigureSilhouette size={120} />
+        )}
         <button type="button" className="float-btn left" aria-label="Back" onClick={back}>
           <BackIcon size={22} />
         </button>
-        {photo && <span className="hero-tag">Latest eBay photo</span>}
+        {shownOwn ? (
+          <button type="button" className="hero-tag" onClick={() => setViewing(shownOwn)}>
+            View full photo
+          </button>
+        ) : (
+          photo && <span className="hero-tag">Latest eBay photo</span>
+        )}
+        {shownOwn && (
+          <button type="button" className="hero-remove" onClick={removeOwnPhoto}>
+            Remove photo
+          </button>
+        )}
       </div>
+      {ownPhotos.length > 1 && (
+        <div className="hero-strip">
+          {ownPhotos.map((id, index) => (
+            <button
+              key={id}
+              type="button"
+              className={id === shownOwn ? 'on' : ''}
+              aria-label={`Show photo ${index + 1}`}
+              onClick={() => setOwnIndex(index)}
+            >
+              <img src={`/api/photos/${id}`} alt="" />
+            </button>
+          ))}
+        </div>
+      )}
+      </>
 
   )
   const nameBlock = (
@@ -364,6 +420,7 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
             {listingsBlock}
           </div>
         </div>
+        {viewing && <PhotoViewer src={`/api/photos/${viewing}`} onClose={() => setViewing(null)} />}
       </main>
     )
   }
@@ -381,6 +438,7 @@ export default function FigureDetail({ figureId, tracked, back, go, notify, onCo
         {addError && <p className="error">{addError}</p>}
       </div>
       {actionsBlock}
+      {viewing && <PhotoViewer src={`/api/photos/${viewing}`} onClose={() => setViewing(null)} />}
     </main>
   )
 }

@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PACKAGING, computeEstimate, targetLabel } from './estimate.js'
 import { BackIcon, CameraIcon, CheckIcon, ChevronDownIcon, CloseIcon, FigureSilhouette, ImageIcon, PlusIcon } from './icons.jsx'
 import { GRADE_NAMES, GradePicker, Segmented, Sheet, Spinner, Stepper } from './ui.jsx'
+import { MAX_PHOTOS, preparePhoto } from './preparePhoto.js'
 import { money, wholeMoney } from './shared.js'
 
-const MAX_PHOTOS = 8
-const MAX_EDGE = 1568
 const FILE_INPUT_ID = 'appraise-photo-input'
 const CAMERA_INPUT_ID = 'appraise-camera-input'
 const TRACK_CONDITION = { loose: '3000', opened_with_packaging: '3000', sealed: '1000' }
@@ -36,25 +35,6 @@ async function postJson(url, body) {
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`)
   return data
-}
-
-async function preparePhoto(file) {
-  let bitmap
-  try {
-    bitmap = await createImageBitmap(file)
-  } catch {
-    throw new Error(`Couldn't read ${file.name}. Use a JPEG or PNG (iPhone HEIC photos may need exporting).`)
-  }
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close?.()
-  return {
-    id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
-    dataUrl: canvas.toDataURL('image/jpeg', 0.85),
-  }
 }
 
 // Seconds since `startedAt`, ticking while it is set.
@@ -123,6 +103,7 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
   const [showCondition, setShowCondition] = useState(false)
   const [status, setStatus] = useState(null)
   const [photos, setPhotos] = useState([])
+  const [savedPhotoIds, setSavedPhotoIds] = useState([])
   const [activePhoto, setActivePhoto] = useState(0)
   const [photoError, setPhotoError] = useState('')
   const [dragging, setDragging] = useState(false)
@@ -146,6 +127,7 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
   const [trackedId, setTrackedId] = useState(null)
   const [collecting, setCollecting] = useState(false)
   const [collected, setCollected] = useState(null) // null | 'added' | 'another'
+  const ownedSaved = useRef(null)
   const [collectError, setCollectError] = useState('')
   const [paid, setPaid] = useState('')
   const [paidTouched, setPaidTouched] = useState(false)
@@ -318,6 +300,16 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
     findPrices(choice, choice.ebaySearchQuery)
   }
 
+  // Uploads shots that are not already stored. The figure itself is saved first.
+  async function keepPhotos(figureId) {
+    const pending = photos.filter((photo) => !savedPhotoIds.includes(photo.id))
+    if (pending.length === 0) return
+    await postJson(`/api/tracked-figures/${figureId}/photos`, {
+      photos: pending.map((photo) => ({ dataUrl: photo.dataUrl })),
+    })
+    setSavedPhotoIds((current) => [...current, ...pending.map((photo) => photo.id)])
+  }
+
   // Saves the figure to the watchlist once and returns its id.
   async function ensureTracked() {
     if (trackedId) return trackedId
@@ -339,6 +331,13 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
     setTrackError('')
     try {
       const id = await ensureTracked()
+      try {
+        await keepPhotos(id)
+      } catch (err) {
+        setTrackError(`${candidate.name} is on your Watchlist, but the photos were not saved. ${err.message}`)
+        return
+      }
+      await reloadTracked()
       notify(`Watching ${candidate.name}. Prices are checked every night.`)
       go(`#/figure/${id}`)
     } catch (err) {
@@ -353,19 +352,29 @@ export default function Appraise({ back, go, notify, reloadTracked, onCollection
     setCollectError('')
     try {
       const trackedFigureId = await ensureTracked()
-      const data = await postJson('/api/collection', {
-        trackedFigureId,
-        grade,
-        packaging,
-        purchasePrice: paidValue.trim(),
-        acquiredAt,
-        quantity: copies,
-        notes: ownNotes.trim(),
-      })
-      setCollected(data.created ? 'added' : 'another')
+      if (ownedSaved.current == null) {
+        const data = await postJson('/api/collection', {
+          trackedFigureId,
+          grade,
+          packaging,
+          purchasePrice: paidValue.trim(),
+          acquiredAt,
+          quantity: copies,
+          notes: ownNotes.trim(),
+        })
+        ownedSaved.current = data.created
+        onCollectionChanged()
+      }
+      try {
+        await keepPhotos(trackedFigureId)
+      } catch (err) {
+        setCollectError(`${candidate.name} is in your Collection, but the photos were not saved. ${err.message}`)
+        return
+      }
+      setCollected(ownedSaved.current ? 'added' : 'another')
       onCollectionChanged()
       notify(
-        data.created
+        ownedSaved.current
           ? `${candidate.name} is in your Collection.`
           : `You already had ${candidate.name}, so its count went up by ${copies}.`,
       )

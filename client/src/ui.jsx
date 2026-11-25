@@ -1,5 +1,37 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { CloseIcon, FigureSilhouette } from './icons.jsx'
 import { direction } from './shared.js'
+
+export function PhotoViewer({ src, onClose }) {
+  useEffect(() => {
+    function onKey(event) {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      onClose()
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [onClose])
+  return (
+    <div className="photo-viewer" role="dialog" aria-modal="true" aria-label="Full photo">
+      <button type="button" className="photo-viewer-backdrop" aria-label="Close photo" onClick={onClose} />
+      <img src={src} alt="Your figure" />
+      <button type="button" className="photo-viewer-close" aria-label="Close photo" onClick={onClose}>
+        <CloseIcon size={18} />
+      </button>
+    </div>
+  )
+}
+
+export function FigureThumb({ photoId, small = false, children }) {
+  return (
+    <span className={small ? 'thumb sm' : 'thumb'}>
+      {photoId ? <img src={`/api/photos/${photoId}`} alt="" /> : <FigureSilhouette size={small ? 22 : 30} />}
+      {children}
+    </span>
+  )
+}
 
 export function Sparkline({ points, dir, width = 64, height = 22 }) {
   if (!points || points.length < 2) return <span className="spark-empty" style={{ width, height }} aria-hidden="true" />

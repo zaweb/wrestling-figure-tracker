@@ -476,6 +476,13 @@ p.muted {
 .thumb svg {
   opacity: 0.55;
 }
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+  background: #fff;
+}
 .qty-badge {
   position: absolute;
   right: -5px;
@@ -983,12 +990,30 @@ p.muted {
 }
 .hero {
   position: relative;
-  height: 236px;
-  background: var(--hero);
+  height: auto;
+  aspect-ratio: 3 / 4;
+  max-height: 75vh;
+  width: 100%;
+  background: #fff;
   color: var(--thumb-ink);
   display: grid;
   place-items: center;
   overflow: hidden;
+}
+.hero-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: #fff;
+  cursor: zoom-in;
+}
+button.hero-tag {
+  border: 0;
+  font: inherit;
+  cursor: zoom-in;
 }
 .hero img {
   width: 100%;
@@ -1024,6 +1049,41 @@ p.muted {
   color: #fffdf8;
   padding: 4px 8px;
   border-radius: 8px;
+}
+.hero-remove {
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  border: 0;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(26, 23, 20, 0.75);
+  color: #fffdf8;
+}
+.hero-strip {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px 0;
+}
+.hero-strip button {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  overflow: hidden;
+  background: var(--thumb);
+}
+.hero-strip button.on {
+  border-color: var(--accent);
+}
+.hero-strip img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
 }
 .detail-body {
   padding: 16px 20px;
@@ -1502,16 +1562,65 @@ p.muted {
   place-items: center;
 }
 .shot.photo > button:first-child {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   padding: 0;
   border: 0;
-  background: none;
+  background: #fff;
+}
+.shots.gallery .shot {
+  height: auto;
+  aspect-ratio: 3 / 4;
+}
+.shots.gallery .shot.photo > button:first-child {
+  cursor: zoom-in;
 }
 .shot.photo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #fff;
+}
+.photo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.photo-viewer-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(12, 10, 8, 0.92);
+  cursor: zoom-out;
+}
+.photo-viewer img {
+  position: relative;
+  z-index: 1;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  object-fit: contain;
+  border-radius: 12px;
+  background: #fff;
+}
+.photo-viewer-close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 16px);
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 20px;
+  background: rgba(255, 253, 248, 0.92);
+  color: #1a1714;
+  display: grid;
+  place-items: center;
 }
 .shot.photo.on {
   border: 2px solid var(--accent);
@@ -2360,7 +2469,9 @@ p.muted {
     gap: 16px;
   }
   .desk .hero {
-    height: 260px;
+    height: auto;
+    aspect-ratio: 3 / 4;
+    max-height: 75vh;
     border-radius: 20px;
     border: 1px solid var(--line);
   }

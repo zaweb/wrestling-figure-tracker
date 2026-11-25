@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FigureSilhouette, SortIcon } from './icons.jsx'
-import { Chips, Delta, Sparkline } from './ui.jsx'
+import { SortIcon } from './icons.jsx'
+import { Chips, Delta, FigureThumb, Sparkline } from './ui.jsx'
 import { conditionLabel, direction, money, plural, priceMove, shortDate, signedPercent, sortedSnapshots } from './shared.js'
 
 const FILTERS = ['All', 'Owned', 'Rising', 'Falling'].map((label) => ({ value: label, label }))
@@ -158,9 +158,7 @@ export default function Watchlist({ tracked, error, isDesktop, go }) {
                 <tr key={figure._id} onClick={() => go(`#/figure/${figure._id}`)}>
                   <td>
                     <a className="cell-figure" href={`#/figure/${figure._id}`} onClick={(event) => event.stopPropagation()}>
-                      <span className="thumb sm">
-                        <FigureSilhouette size={22} />
-                      </span>
+                      <FigureThumb photoId={figure.photos?.[0]} small />
                       <span className="row-main">
                         <span className="row-name">{figure.name}</span>
                         <span className="row-sub">
@@ -195,9 +193,7 @@ export default function Watchlist({ tracked, error, isDesktop, go }) {
           {shown.map(({ figure, move, owned, dir, price, sub }) => (
             <li key={figure._id}>
               <a className="row" href={`#/figure/${figure._id}`}>
-                <span className="thumb">
-                  <FigureSilhouette />
-                </span>
+                <FigureThumb photoId={figure.photos?.[0]} />
                 <span className="row-main">
                   <span className="row-name">{figure.name}</span>
                   <span className="row-sub">{sub}</span>
